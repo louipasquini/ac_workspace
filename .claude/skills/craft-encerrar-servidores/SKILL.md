@@ -7,9 +7,9 @@ description: Encerra o trabalho com os Crafts - confere brutos e finalizados, fe
 
 1. **Conferir entregas**
    ```bash
-   ls -laR projetos/<projeto> finalizados/<projeto>
+   ls -laR projetos/<projeto>/brutos projetos/<projeto>/finalizados
    ```
-   Brutos em `projetos/<projeto>/<EXT>/`, finalizados em `finalizados/<projeto>/`. Avise o que estiver faltando.
+   Brutos em `projetos/<projeto>/brutos/<EXT>/`, finalizados em `projetos/<projeto>/finalizados/`. Avise o que estiver faltando.
 2. **Fechar sessões MCP**: feche/descarte os documentos abertos nos servidores (comando de fechar documento do app, via
    `command_run`) sem salvar rascunhos descartáveis. Os processos `<app>-cli mcp` do `.mcp.json` terminam sozinhos
    quando o Claude Code fecha (stdin EOF); não os mate no meio da sessão — o usuário pode querer continuar.

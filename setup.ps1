@@ -18,6 +18,7 @@ param(
   [switch]$ManterBuild,  # não apaga target/
   [switch]$SemBuild,     # só clona
   [switch]$SoMcp,        # só regenera o .mcp.json
+  [switch]$Migrar,       # só converte projetos da estrutura antiga de pastas (ver ESTRUTURA.md)
   [switch]$Ajuda
 )
 $ErrorActionPreference = 'Stop'
@@ -142,9 +143,9 @@ function Select-Apps {
 }
 
 # Pergunta sim/não com setas; sem console interativo, cai no [s/N] digitado.
-function Confirm-Menu([string]$q) {
+function Confirm-Menu([string]$q, [string]$sim = 'Sim, instalar', [string]$nao = 'Não, sair') {
   if (-not (Can-Tui)) { $r = Read-Host "$q [s/N]"; return ($r -match '^[sSyY]') }
-  $opc = 'Sim, instalar', 'Não, sair'
+  $opc = $sim, $nao
   $cur = 0
   $top = Menu-Top 3
   [Console]::CursorVisible = $false
@@ -286,8 +287,8 @@ if ($Checar) {
 $Selecao = @()
 if ($Todos) { $Selecao = $AllApps }
 elseif ($Apps) { $Selecao = @($Apps | ForEach-Object { $_ -split ',' } | Where-Object { $_ } | ForEach-Object { $_.Trim() }) }
-elseif (-not $SoMcp -and (Can-Tui)) { $Selecao = @(Select-Apps); Write-Host '' }
-elseif (-not $SoMcp) {
+elseif (-not $SoMcp -and -not $Migrar -and (Can-Tui)) { $Selecao = @(Select-Apps); Write-Host '' }
+elseif (-not $SoMcp -and -not $Migrar) {
   # Forma digitada: entrada redirecionada, sem menu com setas.
   Write-Host 'Apps disponíveis (pico = disco usado durante a compilação):'
   for ($i = 0; $i -lt $AllApps.Count; $i++) {
@@ -343,17 +344,16 @@ function Install-App($a) {
 }
 
 # ---------- .mcp.json ----------
-# Mesmos argumentos do setup.sh. Raízes: leitura nas 4 pastas de trabalho, escrita só em projetos/ e finalizados/.
+# Mesmos argumentos do setup.sh. Raízes: leitura e escrita só em projetos\ (a separação entre brutos,
+# referencias, materiais e finalizados de cada projeto é regra do CLAUDE.md).
 function Mcp-Args($a) {
-  $roots = @()
-  foreach ($d in 'referencias','materiais','projetos','finalizados') { $roots += '--automation-read-root', (Join-Path $Root $d) }
-  foreach ($d in 'projetos','finalizados') { $roots += '--automation-write-root', (Join-Path $Root $d) }
+  $proj = Join-Path $Root 'projetos'
+  $roots = @('--automation-read-root', $proj, '--automation-write-root', $proj)
   switch ($a) {
-    'photocraft'  { return @('mcp', '--automation-read-root', $Root, '--automation-write-root', $Root) }
     'vectorcraft' { return @('mcp', '--headless') + $roots }
     'filmcraft'   { return @('mcp') }
     'lightcraft'  { return @('mcp', '--library', (Join-Path $Root 'projetos\_bibliotecas\lightcraft')) }
-    'pdfcraft'    { return @('mcp', '--compact', '--root', $Root) }
+    'pdfcraft'    { return @('mcp', '--compact', '--root', $proj) }
     default       { return @('mcp') + $roots }
   }
 }
@@ -369,7 +369,122 @@ function Write-Mcp {
   Ok ".mcp.json gerado com $($servers.Count) servidor(es)"
 }
 
+# ---------- migração da estrutura antiga ----------
+# Antes: referencias\<p>\, materiais\<p>\, projetos\<p>\<EXT>\ e finalizados\<p>\ na raiz.
+# Agora: projetos\<p>\{brutos\<EXT>,referencias,materiais,finalizados}\ (ver ESTRUTURA.md). Mesma lógica do setup.sh.
+$Subpastas = 'brutos', 'referencias', 'materiais', 'finalizados'
+
+function Rel($p) { $p.Substring($Root.Length).TrimStart('\', '/') }
+
+function Project-Dirs {
+  $proj = Join-Path $Root 'projetos'
+  if (-not (Test-Path -LiteralPath $proj)) { return @() }
+  return @(Get-ChildItem -LiteralPath $proj -Directory | Where-Object { $_.Name -notlike '_*' })
+}
+
+function Plan-Migration {
+  $plano = @()
+  foreach ($r in 'referencias', 'materiais', 'finalizados') {
+    $dir = Join-Path $Root $r
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    foreach ($p in Get-ChildItem -LiteralPath $dir -Directory) {
+      $plano += [pscustomobject]@{ De = $p.FullName; Para = (Join-Path (Join-Path (Join-Path $Root 'projetos') $p.Name) $r) }
+    }
+  }
+  foreach ($p in Project-Dirs) {
+    foreach ($s in Get-ChildItem -LiteralPath $p.FullName -Directory | Where-Object { $Subpastas -notcontains $_.Name }) {
+      $plano += [pscustomobject]@{ De = $s.FullName; Para = (Join-Path (Join-Path $p.FullName 'brutos') $s.Name) }
+    }
+  }
+  return $plano
+}
+
+# Corrige caminhos absolutos da estrutura antiga em arquivos de texto de brutos\ e finalizados\ (referencias\ e
+# materiais\ são do usuário). Aceita \ ou / como separador, inclusive \\ escapado em JSON. Devolve os alterados.
+function Fix-Paths {
+  $sep = '[\\/]+'
+  $parts = @($Root -split '[\\/]+' | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) })
+  $rootPat = $(if ($Root -match '^[\\/]') { $sep } else { '' }) + ($parts -join $sep)
+  $seg = '[^\\/"''\r\n]+'
+  $opts = [Text.RegularExpressions.RegexOptions]::IgnoreCase
+  # projetos\<p>\<EXT>\ -> projetos\<p>\brutos\<EXT>\  (não mexe em _bibliotecas nem nas 4 subpastas)
+  $re1 = New-Object regex ("(?<pre>$rootPat(?<s>[\\/]+)projetos\k<s>(?!_)$seg\k<s>)" +
+    "(?!(?:brutos|referencias|materiais|finalizados)\k<s>)(?=$seg\k<s>)"), $opts
+  # referencias|materiais|finalizados\<p>\ -> projetos\<p>\<subpasta>\
+  $re2 = New-Object regex ("(?<base>$rootPat)(?<s>[\\/]+)(?<sub>referencias|materiais|finalizados)\k<s>(?<p>$seg)\k<s>"), $opts
+  $alterados = @()
+  foreach ($p in Project-Dirs) {
+    foreach ($sub in 'brutos', 'finalizados') {
+      $d = Join-Path $p.FullName $sub
+      if (-not (Test-Path -LiteralPath $d)) { continue }
+      foreach ($f in Get-ChildItem -LiteralPath $d -Recurse -File | Where-Object { $_.Length -lt 50MB }) {
+        $bytes = [IO.File]::ReadAllBytes($f.FullName)
+        if ([Array]::IndexOf($bytes, [byte]0, 0, [Math]::Min($bytes.Length, 8000)) -ge 0) { continue }  # binário
+        $bom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+        $txt = [Text.Encoding]::UTF8.GetString($bytes)
+        if ($bom) { $txt = $txt.Substring(1) }
+        $novo = $re1.Replace($txt, '${pre}brutos${s}')
+        $novo = $re2.Replace($novo, '${base}${s}projetos${s}${p}${s}${sub}${s}')
+        if ($novo -ceq $txt) { continue }
+        [IO.File]::WriteAllText($f.FullName, $novo, (New-Object Text.UTF8Encoding $bom))
+        $alterados += $f.FullName
+      }
+    }
+  }
+  return $alterados
+}
+
+function Migrate {
+  $plano = @(Plan-Migration)
+  if ($plano.Count -eq 0) {
+    if ($Migrar) { Ok 'nada a migrar: já está na estrutura projetos\<projeto>\{brutos,referencias,materiais,finalizados}' }
+    return
+  }
+  Write-Host ''
+  Warn 'Estrutura antiga de pastas encontrada (ver ESTRUTURA.md). Vai mover:'
+  foreach ($m in $plano) { Write-Host ('      {0}  ->  {1}' -f (Rel $m.De), (Rel $m.Para)) }
+  Write-Host '    e corrigir os caminhos absolutos gravados nos brutos de texto.'
+  Write-Host '    Feche antes as sessões do Claude Code que estiverem usando esta pasta.'
+  if (-not $Sim) {
+    if ([Console]::IsInputRedirected) { Warn 'migração pulada (sem console interativo): rode .\setup.ps1 -Migrar -Sim'; return }
+    Write-Host ''
+    if (-not (Confirm-Menu 'Migrar agora?' 'Sim, migrar' 'Não, depois')) { Warn 'migração pulada: rode .\setup.ps1 -Migrar quando quiser'; return }
+  }
+
+  $movidos = 0; $pulados = 0
+  foreach ($m in $plano) {
+    if ((Test-Path -LiteralPath $m.Para) -and @(Get-ChildItem -LiteralPath $m.Para -Force).Count -gt 0) {
+      Warn "pulado (o destino já tem arquivos): $(Rel $m.De)"; $pulados++; continue
+    }
+    if (Test-Path -LiteralPath $m.Para) { Remove-Item -LiteralPath $m.Para }
+    New-Item -ItemType Directory -Force (Split-Path $m.Para) | Out-Null
+    Move-Item -LiteralPath $m.De -Destination $m.Para
+    $movidos++
+  }
+  Ok "$movidos pasta(s) movida(s)"
+
+  foreach ($p in Project-Dirs) {
+    foreach ($s in $Subpastas) { New-Item -ItemType Directory -Force (Join-Path $p.FullName $s) | Out-Null }
+  }
+  $alterados = @(Fix-Paths)
+  if ($alterados.Count) {
+    Ok "caminhos corrigidos em $($alterados.Count) arquivo(s):"
+    foreach ($f in $alterados) { Write-Host "      $(Rel $f)" }
+  }
+
+  foreach ($r in 'referencias', 'materiais', 'finalizados') {
+    $d = Join-Path $Root $r
+    if (-not (Test-Path -LiteralPath $d)) { continue }
+    Remove-Item -LiteralPath (Join-Path $d '.gitkeep') -Force -ErrorAction SilentlyContinue
+    if (@(Get-ChildItem -LiteralPath $d -Force).Count -eq 0) { Remove-Item -LiteralPath $d }
+    else { Warn "$r\ não ficou vazia (veja os avisos acima); confira à mão" }
+  }
+  if ($pulados) { Warn "$pulados pasta(s) puladas: junte-as à mão e rode .\setup.ps1 -Migrar de novo" }
+}
+
 # ---------- main ----------
+if ($Migrar) { Migrate; exit 0 }
+Migrate
 if (-not $SoMcp) {
   Assess
   Install-Prereqs
@@ -377,9 +492,7 @@ if (-not $SoMcp) {
   Log "Apps escolhidos: $($Selecao -join ' ')"
   foreach ($a in $Selecao) { Install-App $a }
 }
-foreach ($d in 'referencias','materiais','projetos','finalizados','projetos\_bibliotecas\lightcraft') {
-  New-Item -ItemType Directory -Force (Join-Path $Root $d) | Out-Null
-}
+New-Item -ItemType Directory -Force (Join-Path $Root 'projetos\_bibliotecas\lightcraft') | Out-Null
 Write-Mcp
 Write-Host ''
 Show-List

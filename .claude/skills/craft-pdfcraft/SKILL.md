@@ -18,11 +18,11 @@ modo `--compact` expõe: `doc_open`, `doc_info`, `doc_save`, `doc_close`, `page_
 4. Salvar com `doc_save` num caminho novo (não sobrescrever o original das referências).
 
 ## Salvar
-- **Bruto** (skill `craft-salvar-brutos`): `doc_save` / `file.save_as` — o PDF editável é o bruto (`projetos/<projeto>/PDF/`).
+- **Bruto** (skill `craft-salvar-brutos`): `doc_save` / `file.save_as` — o PDF editável é o bruto (`projetos/<projeto>/brutos/PDF/`).
 - **Finalizado** (skill `craft-salvar-finalizados`): `doc_export_images`, `doc_export_text`, `doc_export_office` (docx/pptx), `export.html`, `doc_reduce`/`doc_optimize`, `pdfa_convert`.
 
 ## Notas e limites
-- Raiz única `--root` = pasta `artcraft-mcp/` (a ferramenta confina tudo nela). Escreva apenas em `projetos/` e `finalizados/`. Nunca salve por cima do PDF de `referencias/` ou `materiais/`.
+- Raiz única `--root` = `projetos/` (a ferramenta confina tudo nela). Escreva apenas em `brutos/` e `finalizados/` do projeto. Nunca salve por cima do PDF de `referencias/` ou `materiais/`.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

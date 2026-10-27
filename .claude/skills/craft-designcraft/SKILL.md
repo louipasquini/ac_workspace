@@ -22,7 +22,7 @@ Formato nativo: .designcraft; IDML, INDD (import); exporta PDF, EPUB, HTML, PPTX
 - **Finalizado** (skill `craft-salvar-finalizados`): `file.exportPdf`, `export_png`, `file.exportEpub`, `file.exportHtml`.
 
 ## Notas e limites
-- Multi-raiz de confinamento. Sem fontes de `craft-fonts`, texto CJK pode faltar glifos; use as fontes das referências.
+- Confinamento em `projetos/` (leitura e escrita); escreva só em `brutos/` e `finalizados/` do projeto. Sem fontes de `craft-fonts`, texto CJK pode faltar glifos; use as fontes das referências.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

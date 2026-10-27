@@ -7,14 +7,15 @@ description: Orquestra o fluxo completo de qualquer tarefa criativa nesta pasta 
 
 Conduza a tarefa nesta ordem, ativando cada skill na sequência. Detalhes em `WORKFLOW.md`.
 
-1. **`craft-novo-projeto`** — definir `YYYY-MM-DD-nome-do-projeto` e criar as pastas.
-2. **`craft-ler-referencias`** — ler `referencias/<projeto>/`, `CONTEXTO.md` e `materiais/<projeto>/`; resumir ao usuário
+1. **`craft-novo-projeto`** — definir `YYYY-MM-DD-nome-do-projeto` e criar `projetos/<projeto>/` com `brutos/`,
+   `referencias/`, `materiais/` e `finalizados/`.
+2. **`craft-ler-referencias`** — ler `referencias/` (com o `CONTEXTO.md`) e `materiais/` do projeto; resumir ao usuário
    o que entendeu e quais materiais serão usados.
 3. **`craft-subir-servidores`** — decidir quais Crafts a tarefa exige e confirmar que o MCP de cada um responde.
 4. **Desenvolver** com a skill do app: `craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`,
    `craft-lightcraft`, `craft-pdfcraft`, `craft-figcraft`, `craft-effectcraft`, `craft-soundcraft`, `craft-designcraft`.
-5. **`craft-salvar-brutos`** — salvar os editáveis em `projetos/<projeto>/<EXT>/`.
-6. **`craft-salvar-finalizados`** — exportar os entregáveis em `finalizados/<projeto>/`.
+5. **`craft-salvar-brutos`** — salvar os editáveis em `projetos/<projeto>/brutos/<EXT>/`.
+6. **`craft-salvar-finalizados`** — exportar os entregáveis em `projetos/<projeto>/finalizados/`.
 7. **`craft-encerrar-servidores`** — fechar sessões, verificar processos, resumir a entrega.
 
 ## Mapa tarefa → apps

@@ -22,7 +22,7 @@ Formato nativo: .figcraft; exporta PNG/SVG/PDF.
 - **Finalizado** (skill `craft-salvar-finalizados`): `export` (PNG/SVG/PDF), `figcraft-cli export doc.figcraft -o dir --format svg`.
 
 ## Notas e limites
-- Multi-raiz de confinamento ativa. Comandos programáticos nunca abrem diálogos.
+- Confinamento em `projetos/` ativo (escreva só em `brutos/` e `finalizados/` do projeto). Comandos programáticos nunca abrem diálogos.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

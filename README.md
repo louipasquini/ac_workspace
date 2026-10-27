@@ -89,7 +89,8 @@ Sem argumentos, o script:
 4. para cada app: clona `github.com/storytold/<app>` em `<app>/` (clone raso, só o último commit), compila só o
    servidor MCP (`cargo build --release -p <app>-cli`), apaga o cache de compilação (`target/`) e mantém só o
    binário em `<app>/target/release/<app>-cli` (`.exe` no Windows);
-5. cria `referencias/`, `materiais/`, `projetos/`, `finalizados/` e a biblioteca do LightCraft;
+5. cria `projetos/` e a biblioteca do LightCraft; se encontrar a estrutura antiga de pastas, oferece a
+   [migração](ESTRUTURA.md#migrando-da-estrutura-antiga);
 6. gera o `.mcp.json` com os caminhos absolutos desta pasta, **só com os apps que estão compilados**.
 
 Depois, abra o Claude Code na pasta e aprove os servidores MCP do projeto.
@@ -156,6 +157,7 @@ tempo: de alguns minutos a mais de meia hora por app, dependendo da máquina.
 | `./setup.sh --manter-build` | `.\setup.ps1 -ManterBuild` | Mantém `target/`: recompilar fica mais rápido, mas ocupa muito mais disco |
 | `./setup.sh --sem-build` | `.\setup.ps1 -SemBuild` | Só clona |
 | `./setup.sh --so-mcp` | `.\setup.ps1 -SoMcp` | Só regenera o `.mcp.json` (ex.: depois de mover a pasta de lugar) |
+| `./setup.sh --migrar` | `.\setup.ps1 -Migrar` | Só converte projetos da [estrutura antiga](ESTRUTURA.md#migrando-da-estrutura-antiga) de pastas |
 
 No Windows, o PowerShell precisa do prefixo `powershell -ExecutionPolicy Bypass -File` quando a política de
 execução bloqueia scripts (o padrão).
@@ -169,24 +171,24 @@ Sempre reabra o Claude Code depois de mudar o `.mcp.json`.
 
 ## Como usar
 
-1. **Prepare as referências** (opcional, mas recomendado):
+1. **Crie a pasta do projeto e coloque referências e materiais** (opcional, mas recomendado). Cada trabalho fica
+   numa pasta só, dentro de `projetos/`:
    ```
-   referencias/2026-10-26-nome-do-projeto/
-   ├── logo.svg, paleta.png, manual-da-marca.pdf, fontes…
-   └── CONTEXTO.md      # briefing: objetivo, público, tom, formatos, prazos
+   projetos/2026-10-26-nome-do-projeto/
+   ├── referencias/   # você: logo.svg, paleta.png, manual-da-marca.pdf, fontes…
+   │   └── CONTEXTO.md  # briefing: objetivo, público, tom, formatos, prazos
+   ├── materiais/     # você: fotos, vídeos gravados, logo final, trilha licenciada, locução, textos aprovados…
+   ├── brutos/        # Claude: editáveis
+   └── finalizados/   # Claude: entregáveis
    ```
-   **Adicione os materiais** que devem entrar na peça (opcional):
-   ```
-   materiais/2026-10-26-nome-do-projeto/
-   └── fotos, vídeos gravados, logo final, trilha licenciada, locução, textos aprovados…
-   ```
+   Se você não criar a pasta, o Claude cria ao começar o trabalho e avisa onde colocar os arquivos.
 2. **Abra o Claude Code nesta pasta** (depois do [setup](#instalação)) e aprove os servidores MCP do projeto (`.mcp.json`) na primeira vez.
 3. **Peça a tarefa.** O Claude ativa o workflow (`craft-workflow`), lê as referências, conecta aos apps, desenvolve,
    salva e encerra.
 4. **Retire os resultados:**
    ```
-   projetos/2026-10-26-nome-do-projeto/<EXT>/arquivo.<ext>   # editáveis (brutos)
-   finalizados/2026-10-26-nome-do-projeto/                   # entregáveis
+   projetos/2026-10-26-nome-do-projeto/brutos/<EXT>/arquivo.<ext>   # editáveis
+   projetos/2026-10-26-nome-do-projeto/finalizados/                 # entregáveis
    ```
 
 A estrutura completa está em [`ESTRUTURA.md`](ESTRUTURA.md) e o fluxo detalhado em [`WORKFLOW.md`](WORKFLOW.md).
@@ -208,10 +210,10 @@ A estrutura completa está em [`ESTRUTURA.md`](ESTRUTURA.md) e o fluxo detalhado
   | Encerramento | `craft-encerrar-servidores` |
   | Apps | `craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`, `craft-lightcraft`, `craft-pdfcraft`, `craft-figcraft`, `craft-effectcraft`, `craft-soundcraft`, `craft-designcraft` |
 
-- **Confinamento de arquivos:** leitura em `referencias/`, `materiais/`, `projetos/`, `finalizados/`; escrita em `projetos/` e
-  `finalizados/`. Isso vale para VectorCraft, FigCraft, EffectCraft, SoundCraft e DesignCraft.
-  **Exceções:** PhotoCraft e PdfCraft aceitam só uma raiz (usamos a pasta inteira); FilmCraft e LightCraft não têm
-  confinamento. Nesses quatro, a disciplina é instrução ao Claude (ver `CLAUDE.md`).
+- **Confinamento de arquivos:** os servidores só leem e escrevem dentro de `projetos/`. Isso vale para PhotoCraft,
+  VectorCraft, PdfCraft, FigCraft, EffectCraft, SoundCraft e DesignCraft; FilmCraft e LightCraft não têm confinamento.
+  Dentro de `projetos/`, a regra de escrever só em `brutos/` e `finalizados/` e nunca mexer em `referencias/` e
+  `materiais/` é instrução ao Claude (ver `CLAUDE.md`), porque os apps não restringem subpastas por projeto.
 - **LightCraft:** usa uma biblioteca persistente compartilhada em `projetos/_bibliotecas/lightcraft` (um álbum por projeto).
 
 ## Solução de problemas
@@ -225,14 +227,15 @@ A estrutura completa está em [`ESTRUTURA.md`](ESTRUTURA.md) e o fluxo detalhado
 | Windows: `link.exe not found` ao compilar | Faltam as ferramentas C++ do Visual Studio | Rode o setup de novo ou instale o Build Tools com "Desenvolvimento para desktop com C++" |
 | Windows: erro de caminho longo no clone | Limite de 260 caracteres | O setup já usa `core.longpaths`; mova a pasta para um caminho curto (ex.: `C:\artcraft`) |
 | Setup: "No space left on device" | Disco cheio durante a compilação | Libere espaço para o maior app da seleção (tabela acima) e rode de novo |
-| "outside the automation roots" | Caminho fora das raízes (`referencias/`, `materiais/`, `projetos/`, `finalizados/`) ou relativo | Use caminho absoluto dentro das raízes |
+| "outside the automation roots" | Caminho fora de `projetos/` ou relativo | Use caminho absoluto dentro de `projetos/` |
+| Pastas `referencias/`, `materiais/` ou `finalizados/` na raiz | Estrutura antiga de pastas | Feche as sessões do Claude Code e rode `./setup.sh --migrar` (Windows: `.\setup.ps1 -Migrar`) |
 | LightCraft: "library already open" | Biblioteca em uso por outro processo (ex.: outra sessão do Claude Code aberta) | Feche a outra sessão; use só um processo por biblioteca |
 | Muitas ferramentas (PdfCraft tem 179) | — | Já usamos `--compact`; o resto via `tool_search`/`tool_call` |
 
 ## Controle de versão
 
 Este diretório é um repositório git que versiona só o workflow (docs, skills, `setup.sh`/`setup.ps1`). As pastas dos 9 apps
-(repositórios próprios), o `.mcp.json` gerado e o conteúdo de `referencias/`, `materiais/`, `projetos/`, `finalizados/` ficam fora (ver `.gitignore`).
+(repositórios próprios), o `.mcp.json` gerado e o conteúdo de `projetos/` ficam fora (ver `.gitignore`).
 
 ## Avisos
 

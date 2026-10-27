@@ -56,6 +56,7 @@ Sem opções, abre um menu para escolher os apps.
   --manter-build     Não apaga o cache de compilação (target/) — rebuilds mais rápidos, muito mais disco
   --sem-build        Só clona; não compila
   --so-mcp           Só regenera o .mcp.json com os apps já compilados
+  --migrar           Só converte projetos da estrutura antiga de pastas (ver ESTRUTURA.md)
   -h, --ajuda        Esta ajuda
 
 Apps: ${APPS[*]}
@@ -138,10 +139,11 @@ escolher_apps() {
   for ((i = 0; i < n; i++)); do if ((sel[i])); then SELECAO+=("${APPS[i]}"); fi; done
 }
 
-# Pergunta sim/não com setas; retorna 0 para sim. Sem TUI, cai no [s/N] digitado.
+# confirmar "pergunta" ["rótulo sim" "rótulo não"]: sim/não com setas; retorna 0 para sim.
+# Sem TUI, cai no [s/N] digitado.
 confirmar() {
   local cur=0 i desenhado=0 resp opc
-  opc=("Sim, instalar" "Não, sair")
+  opc=("${2:-Sim, instalar}" "${3:-Não, sair}")
   if ! tui_ok; then
     read -rp "$1 [s/N] " resp
     [[ $resp =~ ^[sSyY] ]]
@@ -181,7 +183,7 @@ listar() {
 }
 
 # ---------- argumentos ----------
-SELECAO=() ATUALIZAR=0 MANTER=0 BUILD=1 SO_MCP=0 CHECAR=0 ASSUME_YES=0
+SELECAO=() ATUALIZAR=0 MANTER=0 BUILD=1 SO_MCP=0 CHECAR=0 ASSUME_YES=0 MIGRAR=0
 while (($#)); do
   case $1 in
     --apps) [[ $# -ge 2 ]] || die "--apps exige uma lista"; IFS=, read -ra SELECAO <<<"$2"; shift ;;
@@ -194,6 +196,7 @@ while (($#)); do
     --manter-build) MANTER=1 ;;
     --sem-build) BUILD=0 ;;
     --so-mcp) SO_MCP=1 ;;
+    --migrar) MIGRAR=1 ;;
     -h|--ajuda|--help) uso; exit 0 ;;
     *) die "opção desconhecida: $1 (veja --ajuda)" ;;
   esac
@@ -347,14 +350,14 @@ if ((CHECAR)); then
 fi
 
 # ---------- menu interativo ----------
-if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)); then
+if ((!SO_MCP && !MIGRAR)) && ((${#SELECAO[@]} == 0)); then
   [[ -t 0 ]] || die "nenhum app escolhido; use --apps a,b ou --todos"
 fi
-if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)) && tui_ok; then
+if ((!SO_MCP && !MIGRAR)) && ((${#SELECAO[@]} == 0)) && tui_ok; then
   escolher_apps
   echo
 fi
-if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)); then
+if ((!SO_MCP && !MIGRAR)) && ((${#SELECAO[@]} == 0)); then
   # Forma digitada: terminal sem suporte ao menu com setas.
   echo "Apps disponíveis (pico = disco usado durante a compilação):"
   i=1
@@ -404,20 +407,17 @@ instalar() {
 }
 
 # ---------- .mcp.json ----------
-# Raízes de confinamento: leitura nas 4 pastas de trabalho, escrita só em projetos/ e finalizados/.
-# Mantenha os argumentos iguais aos de setup.ps1.
+# Raízes de confinamento: leitura e escrita só em projetos/ (cada projeto tem brutos, referencias, materiais e
+# finalizados dentro dela; a separação entre subpastas é regra do CLAUDE.md). Mantenha igual ao setup.ps1.
 roots_args() {
-  local d
-  for d in referencias materiais projetos finalizados; do printf ',\n        "--automation-read-root", "%s/%s"' "$ROOT" "$d"; done
-  for d in projetos finalizados; do printf ',\n        "--automation-write-root", "%s/%s"' "$ROOT" "$d"; done
+  printf ',\n        "--automation-read-root", "%s/projetos",\n        "--automation-write-root", "%s/projetos"' "$ROOT" "$ROOT"
 }
 mcp_args() {
   case $1 in
-    photocraft)  printf '"mcp", "--automation-read-root", "%s", "--automation-write-root", "%s"' "$ROOT" "$ROOT" ;;
     vectorcraft) printf '"mcp", "--headless"'; roots_args ;;
     filmcraft)   printf '"mcp"' ;;
     lightcraft)  printf '"mcp", "--library", "%s/projetos/_bibliotecas/lightcraft"' "$ROOT" ;;
-    pdfcraft)    printf '"mcp", "--compact", "--root", "%s"' "$ROOT" ;;
+    pdfcraft)    printf '"mcp", "--compact", "--root", "%s/projetos"' "$ROOT" ;;
     *)           printf '"mcp"'; roots_args ;;
   esac
 }
@@ -438,10 +438,117 @@ gerar_mcp() {
 }
 
 preparar_pastas() {
-  mkdir -p "$ROOT"/{referencias,materiais,projetos,finalizados} "$ROOT/projetos/_bibliotecas/lightcraft"
+  mkdir -p "$ROOT/projetos/_bibliotecas/lightcraft"
+}
+
+# ---------- migração da estrutura antiga ----------
+# Antes: referencias/<p>/, materiais/<p>/, projetos/<p>/<EXT>/ e finalizados/<p>/ na raiz.
+# Agora: projetos/<p>/{brutos/<EXT>,referencias,materiais,finalizados}/ (ver ESTRUTURA.md).
+eh_subpasta() { case $1 in brutos|referencias|materiais|finalizados) return 0 ;; esac; return 1; }
+
+# Imprime as mudanças pendentes, uma por linha: "origem<TAB>destino".
+planejar_migracao() {
+  local r d p s
+  for r in referencias materiais finalizados; do
+    for d in "$ROOT/$r"/*/; do
+      [[ -d $d ]] || continue
+      p=$(basename "$d")
+      printf '%s\t%s\n' "$ROOT/$r/$p" "$ROOT/projetos/$p/$r"
+    done
+  done
+  for d in "$ROOT"/projetos/*/; do
+    [[ -d $d ]] || continue
+    p=$(basename "$d")
+    if [[ $p == _* ]]; then continue; fi
+    for s in "$d"*/; do
+      [[ -d $s ]] || continue
+      s=$(basename "$s")
+      if eh_subpasta "$s"; then continue; fi
+      printf '%s\t%s\n' "$ROOT/projetos/$p/$s" "$ROOT/projetos/$p/brutos/$s"
+    done
+  done
+}
+
+# Corrige caminhos absolutos da estrutura antiga em arquivos de texto (ex.: .ecproj, scripts). Só mexe em
+# brutos/ e finalizados/: referencias/ e materiais/ são do usuário. Imprime os arquivos alterados.
+corrigir_caminhos() {
+  local arqs=() f d
+  for d in "$ROOT"/projetos/*/brutos "$ROOT"/projetos/*/finalizados; do
+    [[ -d $d ]] || continue
+    while IFS= read -r -d '' f; do arqs+=("$f"); done < <(
+      grep -rlIF --null -e "$ROOT/referencias/" -e "$ROOT/materiais/" -e "$ROOT/finalizados/" -e "$ROOT/projetos/" "$d" 2>/dev/null || true)
+  done
+  ((${#arqs[@]})) || return 0
+  ROOT_MIG="$ROOT" perl -e '
+    my $r = quotemeta $ENV{ROOT_MIG};
+    my $seg = q{[^/"\x27\n]+};
+    for my $f (@ARGV) {
+      open(my $h, "<", $f) or next; local $/; my $s = <$h>; close $h; my $o = $s;
+      # projetos/<p>/<EXT>/ -> projetos/<p>/brutos/<EXT>/  (não mexe em _bibliotecas nem nas 4 subpastas)
+      $s =~ s{($r/projetos/(?!_)$seg/)(?!(?:brutos|referencias|materiais|finalizados)/)(?=$seg/)}{${1}brutos/}g;
+      # referencias|materiais|finalizados/<p>/ -> projetos/<p>/<subpasta>/
+      $s =~ s{$r/(referencias|materiais|finalizados)/($seg)/}{$ENV{ROOT_MIG}/projetos/$2/$1/}g;
+      next if $s eq $o;
+      open($h, ">", $f) or die "$f: $!"; print $h $s; close $h; print "$f\n";
+    }' "${arqs[@]}"
+}
+
+migrar() {
+  local plano origem destino movidos=0 pulados=0 r d p alterados
+  plano=$(planejar_migracao)
+  if [[ -z $plano ]]; then
+    if ((MIGRAR)); then ok "nada a migrar: já está na estrutura projetos/<projeto>/{brutos,referencias,materiais,finalizados}"; fi
+    return 0
+  fi
+  echo
+  warn "Estrutura antiga de pastas encontrada (ver ESTRUTURA.md). Vai mover:"
+  while IFS=$'\t' read -r origem destino; do
+    printf '      %s  →  %s\n' "${origem#"$ROOT"/}" "${destino#"$ROOT"/}"
+  done <<<"$plano"
+  echo "    e corrigir os caminhos absolutos gravados nos brutos de texto."
+  echo "    Feche antes as sessões do Claude Code que estiverem usando esta pasta."
+  if ((!ASSUME_YES)); then
+    if [[ ! -t 0 ]]; then warn "migração pulada (sem terminal interativo): rode ./setup.sh --migrar --sim"; return 0; fi
+    echo
+    if ! confirmar "Migrar agora?" "Sim, migrar" "Não, depois"; then
+      warn "migração pulada: rode ./setup.sh --migrar quando quiser"; return 0
+    fi
+  fi
+
+  while IFS=$'\t' read -r origem destino; do
+    if [[ -d $destino && -n $(ls -A "$destino") ]]; then
+      warn "pulado (o destino já tem arquivos): ${origem#"$ROOT"/}"; pulados=$((pulados + 1)); continue
+    fi
+    if [[ -d $destino ]]; then rmdir "$destino"; fi
+    mkdir -p "$(dirname "$destino")"
+    mv "$origem" "$destino"; movidos=$((movidos + 1))
+  done <<<"$plano"
+  ok "$movidos pasta(s) movida(s)"
+
+  for d in "$ROOT"/projetos/*/; do
+    p=$(basename "$d")
+    if [[ -d $d && $p != _* ]]; then mkdir -p "$d"{brutos,referencias,materiais,finalizados}; fi
+  done
+  alterados=$(corrigir_caminhos)
+  if [[ -n $alterados ]]; then
+    ok "caminhos corrigidos em $(printf '%s\n' "$alterados" | wc -l | tr -d ' ') arquivo(s):"
+    printf '%s\n' "$alterados" | sed "s#^$ROOT/#      #"
+  fi
+
+  for r in referencias materiais finalizados; do
+    [[ -d $ROOT/$r ]] || continue
+    rm -f "$ROOT/$r/.gitkeep"
+    if ! rmdir "$ROOT/$r" 2>/dev/null; then warn "$r/ não ficou vazia (veja os avisos acima); confira à mão"; fi
+  done
+  if ((pulados)); then warn "$pulados pasta(s) puladas: junte-as à mão e rode ./setup.sh --migrar de novo"; fi
 }
 
 # ---------- main ----------
+if ((MIGRAR)); then
+  migrar
+  exit 0
+fi
+migrar
 if ((!SO_MCP)); then
   if [[ $SO == outro ]]; then warn "sistema não testado ($(uname -s)); seguindo mesmo assim"; fi
   avaliar_prereqs

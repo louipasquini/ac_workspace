@@ -22,7 +22,7 @@ Formato nativo: .scraft (sessão); exporta WAV/FLAC/MP3, MIDI.
 - **Finalizado** (skill `craft-salvar-finalizados`): `bounce_mix`, `file.bounce_stems`, `file.export_midi`.
 
 ## Notas e limites
-- Multi-raiz de confinamento. Sem dispositivo de áudio no headless: não dá para *ouvir*; verifique níveis/duração com `inspect_session` e informe ao usuário que a escuta é dele.
+- Confinamento em `projetos/` (leitura e escrita); escreva só em `brutos/` e `finalizados/` do projeto. Sem dispositivo de áudio no headless: não dá para *ouvir*; verifique níveis/duração com `inspect_session` e informe ao usuário que a escuta é dele.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

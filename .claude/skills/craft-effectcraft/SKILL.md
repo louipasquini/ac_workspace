@@ -22,7 +22,7 @@ Formato nativo: .ecproj (JSON versionado); exporta MP4 (H.264/HEVC/AV1), ProRes,
 - **Finalizado** (skill `craft-salvar-finalizados`): `renderQueue.render` (vídeo/sequência), `comp.saveFrameAs` (PNG), `file.exportLottie`, `comp.saveFrameAsPsd`/`Exr`.
 
 ## Notas e limites
-- Confinamento multi-raiz: scripts (`run_script`) e as ferramentas `ui_*` são **recusados** enquanto confinado. Áudio: inclua `--audio` no render ou mixe no SoundCraft e junte no FilmCraft.
+- Confinamento em `projetos/` (escreva só em `brutos/` e `finalizados/` do projeto): scripts (`run_script`) e as ferramentas `ui_*` são **recusados** enquanto confinado. Áudio: inclua `--audio` no render ou mixe no SoundCraft e junte no FilmCraft.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

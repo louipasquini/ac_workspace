@@ -10,14 +10,12 @@
 /designcraft/
 
 # Material de trabalho: mídia pesada, não versionar o conteúdo
-/referencias/*
-/materiais/*
 /projetos/*
-/finalizados/*
-!/referencias/.gitkeep
-!/materiais/.gitkeep
 !/projetos/.gitkeep
-!/finalizados/.gitkeep
+# Estrutura antiga (antes de projetos/<projeto>/{brutos,referencias,materiais,finalizados}); ver ESTRUTURA.md
+/referencias/
+/materiais/
+/finalizados/
 
 # Específico da máquina (o .mcp.json é gerado pelo setup.sh com caminhos absolutos)
 .mcp.json

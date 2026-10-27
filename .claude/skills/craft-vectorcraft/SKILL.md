@@ -22,7 +22,7 @@ Formato nativo: .vectorcraft (JSON); SVG, PDF, EPS, DXF.
 - **Finalizado** (skill `craft-salvar-finalizados`): `export` / `document.export`, `document.exportPdf`, `document.exportForScreens`, `document.exportForWeb`.
 
 ## Notas e limites
-- Roda com `--headless` e confinamento multi-raiz (leitura: referencias/materiais/projetos/finalizados; escrita: projetos/finalizados).
+- Roda com `--headless` e confinamento em `projetos/` (leitura e escrita); escreva só em `brutos/` e `finalizados/` do projeto.
 - Descoberta de comandos: `command_list`/`list_commands` com `filter`; `describe_command` quando existir.
 - Sempre caminhos **absolutos**. Sempre **olhar** um preview antes de exportar.
 - Se uma ferramenta falhar, leia a mensagem de erro: parâmetros desconhecidos são rejeitados com a lista aceita.

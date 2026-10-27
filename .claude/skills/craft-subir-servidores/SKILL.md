@@ -27,5 +27,6 @@ esta pasta (o usuário aprova na primeira vez) e os encerra ao sair. Não existe
 5. Reporte ao usuário quais servidores estão ativos e quais não.
 
 ## Confinamento de arquivos
-O `.mcp.json` já limita leitura a `referencias/`, `materiais/`, `projetos/`, `finalizados/` e escrita a `projetos/` e `finalizados/`
-(onde o app suporta). Caminhos passados às ferramentas devem ser **absolutos**, dentro dessas raízes.
+O `.mcp.json` limita leitura e escrita a `projetos/` (onde o app suporta; FilmCraft e LightCraft não têm
+confinamento). Caminhos passados às ferramentas devem ser **absolutos**, dentro de `projetos/`. Dentro dela, só
+escreva em `brutos/` e `finalizados/` do projeto atual.
