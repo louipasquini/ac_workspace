@@ -31,12 +31,15 @@ desc() {
   esac
 }
 # Pico de disco durante a compilação (aprox.). Com a limpeza padrão sobra só o binário.
-pico() {
+# Em décimos de GB, para dar para comparar (o bash não tem ponto flutuante).
+pico_dgb() {
   case $1 in
-    filmcraft) echo "14 GB" ;; figcraft) echo "16 GB" ;; lightcraft) echo "6 GB" ;;
-    effectcraft) echo "2,5 GB" ;; soundcraft) echo "2 GB" ;; *) echo "3 GB" ;;
+    filmcraft) echo 140 ;; figcraft) echo 160 ;; lightcraft) echo 60 ;;
+    effectcraft) echo 25 ;; soundcraft) echo 20 ;; *) echo 30 ;;
   esac
 }
+fmt_gb() { if (($1 % 10)); then echo "$(($1 / 10)),$(($1 % 10)) GB"; else echo "$(($1 / 10)) GB"; fi; }
+pico() { fmt_gb "$(pico_dgb "$1")"; }
 
 uso() {
   cat <<EOF
@@ -64,6 +67,106 @@ ok()   { printf '\033[1;32m ok\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m !!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31merro:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# ---------- menus com setas (↑/↓, espaço, enter), no estilo do `specify init` ----------
+# Sem terminal interativo (pipe, CI, TERM=dumb) os chamadores caem na forma digitada.
+tui_ok() { [[ -t 0 && -t 1 && ${TERM:-dumb} != dumb ]]; }
+cursor() { if [[ -t 1 ]]; then printf '\033[?25%s' "$1"; fi; }  # l = esconde, h = mostra
+trap 'cursor h' EXIT
+
+# Lê uma tecla: up|down|space|enter|all|quit|key:<c>
+tecla() {
+  local k r
+  IFS= read -rsn1 k || { echo quit; return; }
+  case $k in
+    $'\033')
+      IFS= read -rsn2 -t 1 r || true
+      case $r in '[A'|OA) echo up ;; '[B'|OB) echo down ;; *) echo quit ;; esac ;;
+    '') echo enter ;;
+    ' ') echo space ;;
+    k|K) echo up ;;
+    j|J) echo down ;;
+    a|A) echo all ;;
+    q|Q) echo quit ;;
+    *) echo "key:$k" ;;
+  esac
+}
+
+# Seleção múltipla dos apps; preenche SELECAO.
+escolher_apps() {
+  local n=${#APPS[@]} cur=0 i a p cont max todos linhas desenhado=0 aviso="" sel=() extra
+  for ((i = 0; i < n; i++)); do sel[i]=0; done
+  linhas=$((n + 4))
+  cursor l
+  while :; do
+    if ((desenhado)); then printf '\033[%dA' "$linhas"; fi
+    desenhado=1
+    printf '\033[2K\033[1mQuais apps instalar?\033[0m \033[2m(↑/↓ move · espaço marca · a todos · enter confirma · q sai)\033[0m\n\033[2K\n'
+    cont=0 max=0
+    for ((i = 0; i < n; i++)); do
+      a=${APPS[i]}
+      extra=""
+      if [[ -x $(bin_path "$a") ]]; then extra=" \033[2m(já instalado)\033[0m"; fi
+      if ((sel[i])); then
+        cont=$((cont + 1)); p=$(pico_dgb "$a"); if ((p > max)); then max=$p; fi
+        mark='\033[32m◉\033[0m'
+      else mark='○'; fi
+      if ((i == cur)); then
+        printf '\033[2K \033[36m❯\033[0m %b \033[1;36m%-12s\033[0m %-7s \033[2m%s\033[0m%b\n' "$mark" "$a" "$(pico "$a")" "$(desc "$a")" "$extra"
+      else
+        printf '\033[2K   %b %-12s %-7s \033[2m%s\033[0m%b\n' "$mark" "$a" "$(pico "$a")" "$(desc "$a")" "$extra"
+      fi
+    done
+    printf '\033[2K\n'
+    if [[ -n $aviso ]]; then printf '\033[2K  \033[33m%s\033[0m\n' "$aviso"
+    elif ((cont)); then printf '\033[2K  %d selecionado(s) · disco livre necessário: ~%s (o maior, compilado por vez)\n' "$cont" "$(fmt_gb "$max")"
+    else printf '\033[2K  \033[2mnenhum selecionado · a coluna mostra o pico de disco durante a compilação\033[0m\n'; fi
+    aviso=""
+    case $(tecla) in
+      up) cur=$(((cur - 1 + n) % n)) ;;
+      down) cur=$(((cur + 1) % n)) ;;
+      space) sel[cur]=$((1 - sel[cur])) ;;
+      all)
+        todos=1
+        for ((i = 0; i < n; i++)); do if ((!sel[i])); then todos=0; fi; done
+        for ((i = 0; i < n; i++)); do sel[i]=$((1 - todos)); done ;;
+      enter) if ((cont)); then break; else aviso="marque ao menos um app com espaço"; fi ;;
+      quit) cursor h; echo; die "cancelado" ;;
+    esac
+  done
+  cursor h
+  SELECAO=()
+  for ((i = 0; i < n; i++)); do if ((sel[i])); then SELECAO+=("${APPS[i]}"); fi; done
+}
+
+# Pergunta sim/não com setas; retorna 0 para sim. Sem TUI, cai no [s/N] digitado.
+confirmar() {
+  local cur=0 i desenhado=0 resp opc
+  opc=("Sim, instalar" "Não, sair")
+  if ! tui_ok; then
+    read -rp "$1 [s/N] " resp
+    [[ $resp =~ ^[sSyY] ]]
+    return
+  fi
+  cursor l
+  while :; do
+    if ((desenhado)); then printf '\033[3A'; fi
+    desenhado=1
+    printf '\033[2K\033[1m%s\033[0m \033[2m(↑/↓ e enter)\033[0m\n' "$1"
+    for i in 0 1; do
+      if ((i == cur)); then printf '\033[2K \033[36m❯ %s\033[0m\n' "${opc[i]}"
+      else printf '\033[2K   %s\n' "${opc[i]}"; fi
+    done
+    case $(tecla) in
+      up|down) cur=$((1 - cur)) ;;
+      enter) break ;;
+      key:s|key:S|key:y|key:Y) cur=0; break ;;
+      key:n|key:N|quit) cur=1; break ;;
+    esac
+  done
+  cursor h
+  ((cur == 0))
+}
+
 bin_path() { echo "$ROOT/$1/target/release/$1-cli"; }
 is_app()   { local a; for a in "${APPS[@]}"; do [[ $a == "$1" ]] && return 0; done; return 1; }
 
@@ -71,7 +174,7 @@ listar() {
   local a st
   for a in "${APPS[@]}"; do
     if [[ -x $(bin_path "$a") ]]; then st="compilado"
-    elif [[ -d $ROOT/$a/.git ]]; then st="baixado (sem binário)"
+    elif [[ -d $ROOT/$a/.git ]]; then st="baixado (sem build)"
     else st="-"; fi
     printf '  %-12s pico ~%-7s %-22s %s\n' "$a" "$(pico "$a")" "$st" "$(desc "$a")"
   done
@@ -201,8 +304,8 @@ instalar_prereqs() {
   if [[ $RUST_ACAO == atualizar ]]; then echo "  - atualização do Rust: rustup update stable && rustup default stable"; fi
   if ((!ASSUME_YES)); then
     [[ -t 0 ]] || die "pré-requisitos ausentes; rode de novo com --sim para instalá-los ou instale-os manualmente"
-    read -rp "Continuar? [s/N] " resp
-    [[ $resp =~ ^[sSyY] ]] || die "cancelado; instale os itens acima e rode de novo"
+    echo
+    confirmar "Instalar agora?" || die "cancelado; instale os itens acima e rode de novo"
   fi
 
   if ((xcode)); then
@@ -246,6 +349,13 @@ fi
 # ---------- menu interativo ----------
 if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)); then
   [[ -t 0 ]] || die "nenhum app escolhido; use --apps a,b ou --todos"
+fi
+if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)) && tui_ok; then
+  escolher_apps
+  echo
+fi
+if ((!SO_MCP)) && ((${#SELECAO[@]} == 0)); then
+  # Forma digitada: terminal sem suporte ao menu com setas.
   echo "Apps disponíveis (pico = disco usado durante a compilação):"
   i=1
   for a in "${APPS[@]}"; do

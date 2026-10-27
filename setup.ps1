@@ -42,6 +42,10 @@ $Pico = @{
   photocraft = '3 GB'; vectorcraft = '3 GB'; filmcraft = '14 GB'; lightcraft = '6 GB'; pdfcraft = '3 GB'
   figcraft = '16 GB'; effectcraft = '2,5 GB'; soundcraft = '2 GB'; designcraft = '3 GB'
 }
+$PicoGb = @{
+  photocraft = 3; vectorcraft = 3; filmcraft = 14; lightcraft = 6; pdfcraft = 3
+  figcraft = 16; effectcraft = 2.5; soundcraft = 2; designcraft = 3
+}
 
 function Log($m)  { Write-Host "==> $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host " ok $m" -ForegroundColor Green }
@@ -52,9 +56,120 @@ function Run([string]$what) { if ($LASTEXITCODE -ne 0) { Die "$what falhou (cód
 
 function BinPath($a) { Join-Path $Root "$a\target\release\$a-cli.exe" }
 
+# ---------- menus com setas (↑/↓, espaço, Enter), no estilo do `specify init` ----------
+# Sem console interativo (entrada/saída redirecionadas) os chamadores caem na forma digitada.
+# Só ASCII nos marcadores: a fonte padrão do console do Windows PowerShell 5.1 não tem ◉/❯.
+function Can-Tui {
+  try { return (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected) } catch { return $false }
+}
+
+# Escreve uma linha do menu ocupando a largura toda (apaga o que havia antes).
+function Menu-Line([string]$text, $color) {
+  $w = [Math]::Max([Console]::WindowWidth - 1, 20)
+  if ($text.Length -gt $w) { $text = $text.Substring(0, $w) }
+  $text = $text.PadRight($w)
+  if ($color) { Write-Host $text -ForegroundColor $color } else { Write-Host $text }
+}
+
+# Reserva $n linhas e devolve a linha do topo (o buffer pode rolar ao reservar).
+function Menu-Top([int]$n) {
+  for ($i = 0; $i -lt $n; $i++) { Write-Host '' }
+  return [Console]::CursorTop - $n
+}
+
+function Read-MenuKey {
+  $k = [Console]::ReadKey($true)
+  switch ($k.Key) {
+    'UpArrow'   { return 'up' }
+    'K'         { return 'up' }
+    'DownArrow' { return 'down' }
+    'J'         { return 'down' }
+    'Spacebar'  { return 'space' }
+    'Enter'     { return 'enter' }
+    'A'         { return 'all' }
+    'Q'         { return 'quit' }
+    'Escape'    { return 'quit' }
+    'S'         { return 'yes' }
+    'Y'         { return 'yes' }
+    'N'         { return 'no' }
+  }
+  return 'other'
+}
+
+# Seleção múltipla dos apps; devolve os escolhidos.
+function Select-Apps {
+  $n = $AllApps.Count
+  $sel = New-Object bool[] $n
+  $cur = 0; $aviso = ''
+  $top = Menu-Top ($n + 4)
+  [Console]::CursorVisible = $false
+  try {
+    while ($true) {
+      [Console]::SetCursorPosition(0, $top)
+      Menu-Line 'Quais apps instalar?  (setas movem - Espaço marca - A todos - Enter confirma - Q sai)' White
+      Menu-Line ''
+      $cont = 0; $max = 0
+      for ($i = 0; $i -lt $n; $i++) {
+        $a = $AllApps[$i]
+        if ($sel[$i]) { $cont++; $max = [Math]::Max($max, $PicoGb[$a]) }
+        $mark = if ($sel[$i]) { '[x]' } else { '[ ]' }
+        $ptr = if ($i -eq $cur) { '>' } else { ' ' }
+        $extra = if (Test-Path (BinPath $a)) { ' (já instalado)' } else { '' }
+        $color = if ($i -eq $cur) { 'Cyan' } elseif ($sel[$i]) { 'Green' } else { $null }
+        Menu-Line (' {0} {1} {2,-12} {3,-7} {4}{5}' -f $ptr, $mark, $a, $Pico[$a], $Desc[$a], $extra) $color
+      }
+      Menu-Line ''
+      if ($aviso) { Menu-Line "  $aviso" Yellow }
+      elseif ($cont) { Menu-Line ('  {0} selecionado(s) - disco livre necessário: ~{1} GB (o maior, compilado por vez)' -f $cont, $max) }
+      else { Menu-Line '  nenhum selecionado - a coluna mostra o pico de disco durante a compilação' DarkGray }
+      $aviso = ''
+      switch (Read-MenuKey) {
+        'up'    { $cur = ($cur - 1 + $n) % $n }
+        'down'  { $cur = ($cur + 1) % $n }
+        'space' { $sel[$cur] = -not $sel[$cur] }
+        'all'   {
+          $todos = -not ($sel -contains $false)
+          for ($i = 0; $i -lt $n; $i++) { $sel[$i] = -not $todos }
+        }
+        'enter' {
+          if ($cont) { return @(for ($i = 0; $i -lt $n; $i++) { if ($sel[$i]) { $AllApps[$i] } }) }
+          $aviso = 'marque ao menos um app com Espaço'
+        }
+        'quit'  { [Console]::CursorVisible = $true; Write-Host ''; Die 'cancelado' }
+      }
+    }
+  } finally { [Console]::CursorVisible = $true }
+}
+
+# Pergunta sim/não com setas; sem console interativo, cai no [s/N] digitado.
+function Confirm-Menu([string]$q) {
+  if (-not (Can-Tui)) { $r = Read-Host "$q [s/N]"; return ($r -match '^[sSyY]') }
+  $opc = 'Sim, instalar', 'Não, sair'
+  $cur = 0
+  $top = Menu-Top 3
+  [Console]::CursorVisible = $false
+  try {
+    while ($true) {
+      [Console]::SetCursorPosition(0, $top)
+      Menu-Line "$q  (setas e Enter)" White
+      for ($i = 0; $i -lt 2; $i++) {
+        if ($i -eq $cur) { Menu-Line (' > ' + $opc[$i]) Cyan } else { Menu-Line ('   ' + $opc[$i]) }
+      }
+      switch (Read-MenuKey) {
+        'up'    { $cur = 1 - $cur }
+        'down'  { $cur = 1 - $cur }
+        'enter' { return ($cur -eq 0) }
+        'yes'   { return $true }
+        'no'    { return $false }
+        'quit'  { return $false }
+      }
+    }
+  } finally { [Console]::CursorVisible = $true }
+}
+
 function Show-List {
   foreach ($a in $AllApps) {
-    $st = if (Test-Path (BinPath $a)) { 'compilado' } elseif (Test-Path (Join-Path $Root "$a\.git")) { 'baixado (sem binário)' } else { '-' }
+    $st = if (Test-Path (BinPath $a)) { 'compilado' } elseif (Test-Path (Join-Path $Root "$a\.git")) { 'baixado (sem build)' } else { '-' }
     '  {0,-12} pico ~{1,-7} {2,-22} {3}' -f $a, $Pico[$a], $st, $Desc[$a]
   }
 }
@@ -127,8 +242,8 @@ function Install-Prereqs {
   if ($script:RustAction -eq 'instalar')  { Write-Host '  - Rust (stable) via rustup em %USERPROFILE%\.cargo e .rustup' }
   if ($script:RustAction -eq 'atualizar') { Write-Host '  - atualização do Rust: rustup update stable; rustup default stable' }
   if (-not $Sim) {
-    $r = Read-Host 'Continuar? [s/N]'
-    if ($r -notmatch '^[sSyY]') { Die 'cancelado; instale os itens acima e rode de novo' }
+    Write-Host ''
+    if (-not (Confirm-Menu 'Instalar agora?')) { Die 'cancelado; instale os itens acima e rode de novo' }
   }
 
   if ($script:Missing -contains 'git') { Winget-Install 'Git.Git' }
@@ -171,7 +286,9 @@ if ($Checar) {
 $Selecao = @()
 if ($Todos) { $Selecao = $AllApps }
 elseif ($Apps) { $Selecao = @($Apps | ForEach-Object { $_ -split ',' } | Where-Object { $_ } | ForEach-Object { $_.Trim() }) }
+elseif (-not $SoMcp -and (Can-Tui)) { $Selecao = @(Select-Apps); Write-Host '' }
 elseif (-not $SoMcp) {
+  # Forma digitada: entrada redirecionada, sem menu com setas.
   Write-Host 'Apps disponíveis (pico = disco usado durante a compilação):'
   for ($i = 0; $i -lt $AllApps.Count; $i++) {
     $a = $AllApps[$i]

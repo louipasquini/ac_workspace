@@ -58,9 +58,34 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
 Sem argumentos, o script:
 
-1. **confere os pré-requisitos** e mostra o que está ok e o que falta;
-2. se faltar algo, **mostra o que vai instalar e pede confirmação** (`s` para seguir);
-3. mostra um **menu numerado** dos apps: digite os números (ex.: `1 2 7`) ou `todos`;
+1. abre um **menu para escolher os apps**, no estilo do `specify init` do spec-kit:
+
+   ```
+   Quais apps instalar? (↑/↓ move · espaço marca · a todos · enter confirma · q sai)
+
+      ○ photocraft   3 GB    Photoshop      — imagens raster
+      ◉ vectorcraft  3 GB    Illustrator    — vetor, logos
+    ❯ ◉ figcraft     16 GB   Figma          — interfaces
+      ○ soundcraft   2 GB    Áudio          — trilha, mixagem (já instalado)
+      …
+
+     2 selecionado(s) · disco livre necessário: ~16 GB (o maior, compilado por vez)
+   ```
+
+   | Tecla | Faz |
+   |---|---|
+   | ↑ / ↓ (ou `k` / `j`) | move |
+   | espaço | marca/desmarca o app |
+   | `a` | marca todos (de novo: desmarca todos) |
+   | enter | confirma |
+   | `q` / Esc | sai sem instalar nada |
+
+   No Windows o menu é o mesmo, com `[x]` e `>` no lugar dos símbolos (a fonte padrão do console não tem ◉/❯).
+   Sem terminal interativo (saída redirecionada, CI), o script volta à lista numerada em que se digitam os
+   números; para automatizar, use `--apps`;
+2. **confere os pré-requisitos** e mostra o que está ok e o que falta;
+3. se faltar algo, **mostra o que vai instalar e pergunta** com um menu *Sim, instalar / Não, sair*
+   (setas + enter, ou `s`/`n`);
 4. para cada app: clona `github.com/storytold/<app>` em `<app>/` (clone raso, só o último commit), compila só o
    servidor MCP (`cargo build --release -p <app>-cli`), apaga o cache de compilação (`target/`) e mantém só o
    binário em `<app>/target/release/<app>-cli` (`.exe` no Windows);
