@@ -1,6 +1,6 @@
 ---
 name: craft-figcraft
-description: Projeta interfaces e protótipos (frames, auto layout, componentes, estilos, variáveis) com o FigCraft via MCP. Use para telas de app/site, UI kits, wireframes e protótipos.
+description: Projeta interfaces e protótipos (frames, auto layout, componentes, estilos, variáveis) com o FigCraft via MCP. Use para telas de app/site, UI kits, wireframes, protótipos e o layout obrigatório de landing pages/sites antes do HTML.
 ---
 
 # FigCraft (equivalente a Figma)
@@ -16,6 +16,10 @@ Formato nativo: .figcraft; exporta PNG/SVG/PDF.
 2. Criar frames e nós com `create_node` (frames com auto layout via `run_command`); estilizar com `set_properties` (cores da identidade).
 3. `inspect_document` para a estrutura; `screenshot` para **olhar** (PNG).
 4. Para renders idênticos entre máquinas, usar fontes embutidas (`--no-system-fonts`) — hoje o servidor usa as fontes do sistema.
+
+## Layout de página web
+Quando o pedido é uma página web, o FigCraft é a etapa obrigatória antes do código: siga `craft-pagina-web`
+(frames `Desktop` 1440 e `Mobile` 390, uma seção por frame filho, conteúdo real, estilos/variáveis da identidade).
 
 ## Salvar
 - **Bruto** (skill `craft-salvar-brutos`): `save_file` (`.figcraft`).

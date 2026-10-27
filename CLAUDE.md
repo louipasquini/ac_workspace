@@ -28,6 +28,7 @@ Ao receber qualquer tarefa criativa, ative a skill **`craft-workflow`** e siga `
 3. `craft-subir-servidores` — escolher os apps e confirmar que o MCP responde.
 4. Desenvolver com a skill do app (`craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`, `craft-lightcraft`,
    `craft-pdfcraft`, `craft-figcraft`, `craft-effectcraft`, `craft-soundcraft`, `craft-designcraft`).
+   Página web: `craft-pagina-web` (layout no FigCraft e aprovação antes do HTML).
 5. `craft-salvar-brutos` — editáveis em `projetos/<projeto>/brutos/<EXT>/`.
 6. `craft-salvar-finalizados` — entregáveis em `projetos/<projeto>/finalizados/`.
 7. `craft-encerrar-servidores` — fechar sessões/processos e resumir.
@@ -51,6 +52,8 @@ projetos/YYYY-MM-DD-nome-do-projeto/
 - O confinamento dos servidores MCP cobre `projetos/` inteira (leitura e escrita); a separação entre
   subpastas e entre projetos é disciplina sua.
 - Use caminhos **absolutos** nas ferramentas MCP (as raízes de confinamento exigem).
+- **Página web** (landing page, site, e-mail HTML): primeiro o layout no FigCraft (desktop + mobile), aprovação do
+  usuário, depois o HTML — skill `craft-pagina-web`. Um hook bloqueia `.html` em projeto sem `brutos/FIGCRAFT/*.figcraft`.
 - Olhe o resultado (`render_preview`/screenshot) antes de salvar como finalizado. Não sobrescreva entregas: use `-v2`.
 - Os Crafts são software em desenvolvimento: se um comando falhar, leia o erro, tente alternativa (CLI do app:
   `<app>/target/release/<app>-cli`) e informe o usuário.

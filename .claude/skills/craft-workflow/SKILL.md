@@ -12,7 +12,7 @@ Conduza a tarefa nesta ordem, ativando cada skill na sequência. Detalhes em `WO
 2. **`craft-ler-referencias`** — ler `referencias/` (com o `CONTEXTO.md`) e `materiais/` do projeto; resumir ao usuário
    o que entendeu e quais materiais serão usados.
 3. **`craft-subir-servidores`** — decidir quais Crafts a tarefa exige e confirmar que o MCP de cada um responde.
-4. **Desenvolver** com a skill do app: `craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`,
+4. **Desenvolver** com a skill do app (página web: `craft-pagina-web`, que passa pelo FigCraft antes do HTML): `craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`,
    `craft-lightcraft`, `craft-pdfcraft`, `craft-figcraft`, `craft-effectcraft`, `craft-soundcraft`, `craft-designcraft`.
 5. **`craft-salvar-brutos`** — salvar os editáveis em `projetos/<projeto>/brutos/<EXT>/`.
 6. **`craft-salvar-finalizados`** — exportar os entregáveis em `projetos/<projeto>/finalizados/`.
@@ -27,11 +27,14 @@ Conduza a tarefa nesta ordem, ativando cada skill na sequência. Detalhes em `WO
 | Revelação de fotos / RAW | LightCraft |
 | Logo, ilustração, ícones | VectorCraft |
 | Interface, protótipo | FigCraft |
+| Página web (landing page, site, e-mail HTML) | FigCraft (layout aprovado) → HTML — skill **`craft-pagina-web`** |
 | Livro, revista, folheto, multipágina | DesignCraft (+ VectorCraft, PhotoCraft) |
 | PDF (editar, juntar, formulários) | PdfCraft |
 | Áudio, trilha, locução | SoundCraft |
 
 ## Regras
+- **Página web passa pelo FigCraft antes do código**: layout desktop + mobile no FigCraft, aprovação do usuário,
+  só então o HTML (skill `craft-pagina-web`). Um hook bloqueia `.html` em projeto sem `brutos/FIGCRAFT/*.figcraft`.
 - Se faltar informação criativa (formato, duração, público, tom) ou a referência for ambígua, **pergunte antes** de produzir.
 - Se a tarefa pedir um app cujas ferramentas MCP não estão disponíveis na sessão, diga ao usuário (o `.mcp.json`
   só é lido ao abrir o Claude Code) em vez de improvisar.

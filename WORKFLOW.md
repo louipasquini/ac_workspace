@@ -53,6 +53,20 @@ cada etapa tem uma skill em `.claude/skills/` que o Claude ativa sozinho (ou voc
   → ajustar. Sempre conferir visualmente antes de exportar.
 - Salvar com frequência (etapa 5) para não perder trabalho.
 
+#### Páginas web (landing page, site, e-mail HTML)
+Nenhum HTML é escrito antes do layout no FigCraft (skill `craft-pagina-web`):
+
+```
+conteúdo e referências ──► layout no FigCraft (Desktop 1440 + Mobile 390) ──► aprovação do usuário
+        ──► HTML fiel ao layout (brutos/HTML/) ──► comparação com o layout ──► finalizados
+```
+
+- O `.figcraft` fica em `brutos/FIGCRAFT/` e é a fonte de verdade de cores, fontes, espaçamentos e ordem das seções.
+- Ajustes de layout pedidos pelo usuário são feitos primeiro no FigCraft, depois no código.
+- O hook `.claude/hooks/exigir-figcraft.py` (registrado em `.claude/settings.json`) recusa a escrita de `.html`
+  dentro de um projeto que ainda não tem `brutos/FIGCRAFT/*.figcraft`. Para pular a etapa, o usuário precisa pedir
+  explicitamente; aí cria-se `brutos/FIGCRAFT/DISPENSADO.md` com o motivo.
+
 ### 5. Brutos (editáveis)
 ```
 projetos/YYYY-MM-DD-nome-do-projeto/brutos/<EXT>/arquivo.<ext>

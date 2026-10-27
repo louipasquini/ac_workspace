@@ -31,6 +31,7 @@ projetos/YYYY-MM-DD-nome-do-projeto/brutos/<EXT>/arquivo.<ext>
 | EffectCraft | `.ecproj` | `ECPROJ/` |
 | SoundCraft | `.scraft` | `SCRAFT/` |
 | DesignCraft | `.designcraft` (IDML se pedido) | `DESIGNCRAFT/` (ou `IDML/`) |
+| Página web (código) | `.html` (só depois do `.figcraft` aprovado) | `HTML/` |
 
 Mídia criada durante o projeto (áudio, vídeo, imagens geradas ou tratadas) vai na pasta da sua extensão dentro de
 `brutos/` (ex.: `brutos/WAV/`, `brutos/PNG/`). Arquivos de `referencias/` e `materiais/` **não** são copiados: os brutos
