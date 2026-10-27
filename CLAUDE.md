@@ -29,6 +29,7 @@ Ao receber qualquer tarefa criativa, ative a skill **`craft-workflow`** e siga `
 4. Desenvolver com a skill do app (`craft-photocraft`, `craft-vectorcraft`, `craft-filmcraft`, `craft-lightcraft`,
    `craft-pdfcraft`, `craft-figcraft`, `craft-effectcraft`, `craft-soundcraft`, `craft-designcraft`).
    Página web: `craft-pagina-web` (layout no FigCraft e aprovação antes do HTML).
+   Cortes verticais de vídeo longo (Reels/TikTok/Shorts): `craft-cortes-redes`.
 5. `craft-salvar-brutos` — editáveis em `projetos/<projeto>/brutos/<EXT>/`.
 6. `craft-salvar-finalizados` — entregáveis em `projetos/<projeto>/finalizados/`.
 7. `craft-encerrar-servidores` — fechar sessões/processos e resumir.

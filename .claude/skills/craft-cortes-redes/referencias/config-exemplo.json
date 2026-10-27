@@ -1,0 +1,40 @@
+{
+ "_comentario": "Modelo com valores FICTÍCIOS. Tempos em segundos do vídeo-fonte; ids = itens do projeto no FilmCraft (project_inspect). Substitua tudo pelos dados do projeto.",
+ "fps": 30,
+ "gap": 0.40,
+ "pre": 0.06,
+ "post": 0.10,
+ "bases": {"C": [101, 102], "T": [103, 104]},
+ "layouts": [[0, 600, "C"], [600, 2400, "T"], [2400, 99999, "C"]],
+ "correcoes": {"marka": "Marca", "dedilaine": "deadline", "feedbéque": "feedback"},
+ "cta": [[30.0, 33.5], [2700.2, 2702.0], [2650.0, 2653.4]],
+ "cta_limite_fim": 2653.5,
+ "respiro": [2655.0, 2655.6],
+ "identidade": {
+  "selo": "NOME DA MARCA",
+  "fonte": "Lato",
+  "estilo_fonte": "Black",
+  "cor_destaque": "#E8A33D",
+  "cor_texto": "#FFFFFF",
+  "cor_trilho_barra": "#3A322D",
+  "trilha_item": 201,
+  "trilha_db": -9,
+  "overlay_cta_item": 202,
+  "posicoes": {
+   "camera": {"selo_y": 105, "gancho_y": 255, "gancho_tamanho": 70, "legenda_tamanho": 66, "legenda_margem": 0.22},
+   "split": {"selo_y": 62, "gancho_y": 765, "gancho_tamanho": 62, "legenda_tamanho": 60, "legenda_margem": 0.09}
+  }
+ },
+ "cortes": {
+  "01-exemplo-pergunta": {
+   "gancho": "PERGUNTA QUE PRENDE\nNOS 3 PRIMEIROS SEGUNDOS?",
+   "destaque": "3 PRIMEIROS SEGUNDOS?",
+   "trechos": [[120.4, 131.0], [133.2, 140.8]]
+  },
+  "02-exemplo-numero": {
+   "gancho": "5 ERROS QUE\nTRAVAM SEU RESULTADO",
+   "destaque": "TRAVAM",
+   "trechos": [[900.0, 915.5], [918.1, 940.0]]
+  }
+ }
+}

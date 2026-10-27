@@ -23,6 +23,7 @@ Conduza a tarefa nesta ordem, ativando cada skill na sequência. Detalhes em `WO
 |---|---|
 | Motion design / animação | EffectCraft (+ VectorCraft para formas, SoundCraft para trilha, FilmCraft para montagem final) |
 | Edição de vídeo | FilmCraft (+ SoundCraft, EffectCraft) |
+| Cortes 9:16 de live/aula/podcast (Reels, TikTok, Shorts) | FilmCraft + SoundCraft — skill **`craft-cortes-redes`** |
 | Retoque / composição de imagem | PhotoCraft |
 | Revelação de fotos / RAW | LightCraft |
 | Logo, ilustração, ícones | VectorCraft |
