@@ -1,0 +1,23 @@
+# Os 9 apps são repositórios próprios
+/photocraft/
+/vectorcraft/
+/filmcraft/
+/lightcraft/
+/pdfcraft/
+/figcraft/
+/effectcraft/
+/soundcraft/
+/designcraft/
+
+# Material de trabalho: mídia pesada, não versionar o conteúdo
+/referencias/*
+/materiais/*
+/projetos/*
+/finalizados/*
+!/referencias/.gitkeep
+!/materiais/.gitkeep
+!/projetos/.gitkeep
+!/finalizados/.gitkeep
+
+# Específico da máquina
+.claude/settings.local.json

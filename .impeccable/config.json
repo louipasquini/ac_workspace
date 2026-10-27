@@ -1,0 +1,71 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:10:51.742Z",
+        "reason": "claude: mockups de app/diff/carrossel recortam conteúdo de propósito, replicando a LP de referência"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:10:51.765Z",
+        "reason": "claude: é o shimmer de carregamento 'Pensando…' do mockup de chat, não texto decorativo"
+      },
+      {
+        "rule": "hero-eyebrow-chip",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:16:45.594Z",
+        "reason": "claude: a LP de referência pedida pelo usuário tem esse elemento; a recriação mantém de propósito (selo PREVIEW acima do título)"
+      },
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:16:45.619Z",
+        "reason": "claude: a LP de referência pedida pelo usuário tem esse elemento; a recriação mantém de propósito (Montserrat é a fonte de títulos da referência)"
+      },
+      {
+        "rule": "radial-spotlight-glow",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:16:45.643Z",
+        "reason": "claude: a LP de referência pedida pelo usuário tem esse elemento; a recriação mantém de propósito (brilho azul do hero e do CTA final)"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:16:45.669Z",
+        "reason": "claude: a LP de referência pedida pelo usuário tem esse elemento; a recriação mantém de propósito (navbar que vira pílula ao rolar; transição única por limiar, não contínua)"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "projetos/2026-10-27-lp-harness/HTML/index.html"
+        ],
+        "createdAt": "2026-10-27T13:16:52.959Z",
+        "reason": "claude: linhas de diff (código) e barra de título do mockup; texto centralizado verticalmente em 44px"
+      }
+    ]
+  }
+}
