@@ -19,5 +19,6 @@
 !/projetos/.gitkeep
 !/finalizados/.gitkeep
 
-# Específico da máquina
+# Específico da máquina (o .mcp.json é gerado pelo setup.sh com caminhos absolutos)
+.mcp.json
 .claude/settings.local.json

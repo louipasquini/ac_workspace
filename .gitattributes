@@ -1,0 +1,2 @@
+# setup.sh precisa de LF mesmo em clones no Windows
+*.sh text eol=lf

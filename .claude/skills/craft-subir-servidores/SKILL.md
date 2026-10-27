@@ -13,10 +13,9 @@ esta pasta (o usuário aprova na primeira vez) e os encerra ao sair. Não existe
 2. Para cada um, confirme que há ferramentas `mcp__<app>__*` disponíveis (use ToolSearch com `+<app>` se estiverem
    adiadas) e faça uma chamada leve: `doc_inspect` (ou `command_list` com `filter`).
 3. Se as ferramentas **não** existem:
-   - Binário ausente? `ls <app>/target/release/<app>-cli`. Se não existir:
-     ```bash
-     export PATH="$HOME/.cargo/bin:$PATH"; (cd <app> && cargo build --release -p <app>-cli)
-     ```
+   - App não baixado ou binário ausente? `./setup.sh --listar`. Se faltar, **pergunte ao usuário** antes de instalar
+     (cada app ocupa vários GB durante a compilação) e então rode `./setup.sh --apps <app>` (Windows: `.\setup.ps1 -Apps <app>`) — ele clona, compila,
+     limpa o cache e regenera o `.mcp.json`. Depois, peça para reabrir o Claude Code.
    - Binário existe, mas a sessão não vê o servidor → o `.mcp.json` só é lido na abertura: peça ao usuário para
      reiniciar o Claude Code nesta pasta e aprovar os servidores do projeto (ou usar `/mcp` para reconectar).
    - Nunca tente simular o MCP por fora sem avisar. O fallback legítimo é a CLI do app
