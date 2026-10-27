@@ -19,9 +19,13 @@ param(
   [switch]$SemBuild,     # só clona
   [switch]$SoMcp,        # só regenera o .mcp.json
   [switch]$Migrar,       # só converte projetos da estrutura antiga de pastas (ver ESTRUTURA.md)
+  [switch]$Desktop,      # instala também os apps com janela (instalador oficial + atalho na área de trabalho)
+  [switch]$SemDesktop,   # não pergunta sobre os apps com janela
   [switch]$Ajuda
 )
 $ErrorActionPreference = 'Stop'
+# O Windows PowerShell 5.1 ainda pode vir sem TLS 1.2 habilitado, e o GitHub/rustup exigem.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 $Root     = $PSScriptRoot
 $RepoBase = 'https://github.com/storytold'
@@ -307,6 +311,14 @@ elseif (-not $SoMcp -and -not $Migrar) {
 }
 foreach ($a in $Selecao) { if ($AllApps -notcontains $a) { Die "app desconhecido: $a" } }
 
+# Apps com janela: pergunta só em console interativo; sem resposta, fica só o MCP.
+$InstalarDesktop = [bool]$Desktop
+if (-not $Desktop -and -not $SemDesktop -and -not $SoMcp -and -not $Migrar -and -not $Sim -and (Can-Tui)) {
+  $InstalarDesktop = Confirm-Menu 'Instalar também os apps com janela (instalador oficial + atalho na área de trabalho)?' `
+    'Sim, com atalho' 'Não, só o MCP'
+  Write-Host ''
+}
+
 # ---------- baixar / compilar ----------
 function Install-App($a) {
   $dir = Join-Path $Root $a
@@ -341,6 +353,69 @@ function Install-App($a) {
     Remove-Item $tmp
   }
   Ok ("${a}: pronto ({0:N0} MB)" -f ((Get-Item $bin).Length / 1MB))
+}
+
+# ---------- apps com janela (instaladores oficiais das releases) ----------
+# Opcional (-Desktop): o MCP continua usando o <app>-cli compilado; isto instala o app com interface para abrir os
+# brutos à mão. Baixa o .msi da release mais recente, confere o SHA-256 que o GitHub publica, instala com o msiexec
+# e copia o atalho do Menu Iniciar para a área de trabalho. Falha de um app só gera aviso; o setup segue.
+$NomeApp = @{
+  photocraft = 'PhotoCraft'; vectorcraft = 'VectorCraft'; filmcraft = 'FilmCraft'; lightcraft = 'LightCraft'
+  pdfcraft = 'PdfCraft'; figcraft = 'FigCraft'; effectcraft = 'EffectCraft'; soundcraft = 'SoundCraft'; designcraft = 'DesignCraft'
+}
+
+function Release-Arch {
+  # Num PowerShell 32 bits em Windows 64 bits, a arquitetura real vem em PROCESSOR_ARCHITEW6432.
+  $p = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+  switch ($p) { 'AMD64' { 'x64' } 'ARM64' { 'arm64' } 'x86' { 'x86' } default { $null } }
+}
+
+function New-DesktopShortcut($a) {
+  $desks = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory')) | Where-Object { $_ }
+  if (@(Get-ChildItem -Path $desks -Filter '*.lnk' -ErrorAction SilentlyContinue | Where-Object { $_.BaseName -like "*$a*" }).Count) {
+    Ok 'atalho na área de trabalho já existe'; return
+  }
+  $menus = @([Environment]::GetFolderPath('CommonPrograms'), [Environment]::GetFolderPath('Programs')) | Where-Object { $_ }
+  $lnk = Get-ChildItem -Path $menus -Recurse -Filter '*.lnk' -ErrorAction SilentlyContinue |
+    Where-Object { $_.BaseName -like "*$a*" } | Select-Object -First 1
+  if (-not $lnk) { Warn "${a}: atalho do Menu Iniciar não encontrado; sem atalho na área de trabalho"; return }
+  Copy-Item -LiteralPath $lnk.FullName -Destination (Join-Path $desks[0] $lnk.Name) -Force
+  Ok "atalho criado em $(Join-Path $desks[0] $lnk.Name)"
+}
+
+function Install-Desktop($a) {
+  $nome = $NomeApp[$a]
+  $arch = Release-Arch
+  if (-not $arch) { Warn "${a} (janela): sem instalador para $env:PROCESSOR_ARCHITECTURE"; return }
+  try {
+    $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/storytold/$a/releases/latest" -Headers @{ 'User-Agent' = 'artcraft-setup' }
+  } catch { Warn "${a} (janela): não consegui consultar a release mais recente ($($_.Exception.Message))"; return }
+  $v = $rel.tag_name.TrimStart('v')
+  $nomeArq = "$a-$v-windows-$arch.msi"
+  $asset = $rel.assets | Where-Object { $_.name -eq $nomeArq } | Select-Object -First 1
+  if (-not $asset) { Warn "${a} (janela): a release $($rel.tag_name) não tem $nomeArq"; return }
+  if ("$($asset.digest)" -notmatch '^sha256:([0-9a-fA-F]{64})$') { Warn "${a} (janela): a release não publica o SHA-256 de $nomeArq; não instalado"; return }
+  $esperado = $Matches[1]
+
+  Log "$nome (janela): baixando $nomeArq"
+  $msi = Join-Path ([IO.Path]::GetTempPath()) $nomeArq
+  $pp = $ProgressPreference; $ProgressPreference = 'SilentlyContinue'  # a barra do 5.1 deixa o download muito lento
+  try { Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $msi -UseBasicParsing }
+  catch { Warn "${a} (janela): download falhou ($($_.Exception.Message))"; return }
+  finally { $ProgressPreference = $pp }
+  if ((Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash -ne $esperado) {
+    Remove-Item -LiteralPath $msi -ErrorAction SilentlyContinue
+    Warn "${a} (janela): SHA-256 não confere; download descartado"; return
+  }
+  Ok 'SHA-256 conferido'
+
+  # /passive mostra só a barra de progresso; o próprio Windows pede elevação se o .msi instalar para todos.
+  $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/passive', '/norestart') -Wait -PassThru
+  Remove-Item -LiteralPath $msi -ErrorAction SilentlyContinue
+  if ($p.ExitCode -eq 1602) { Warn "${a} (janela): instalação cancelada"; return }
+  if ($p.ExitCode -notin 0, 3010) { Warn "${a} (janela): msiexec terminou com código $($p.ExitCode)"; return }
+  Ok "$nome instalado (Menu Iniciar)$(if ($p.ExitCode -eq 3010) { ' - reinicie o Windows para concluir' })"
+  New-DesktopShortcut $a
 }
 
 # ---------- .mcp.json ----------
@@ -491,6 +566,10 @@ if (-not $SoMcp) {
   if (-not (Has nasm)) { $env:AWS_LC_SYS_PREBUILT_NASM = '1' }
   Log "Apps escolhidos: $($Selecao -join ' ')"
   foreach ($a in $Selecao) { Install-App $a }
+  if ($InstalarDesktop) {
+    Log 'Apps com janela'
+    foreach ($a in $Selecao) { Install-Desktop $a }
+  }
 }
 New-Item -ItemType Directory -Force (Join-Path $Root 'projetos\_bibliotecas\lightcraft') | Out-Null
 Write-Mcp

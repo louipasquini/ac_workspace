@@ -17,6 +17,13 @@ case "$(uname -s)" in
   *) SO=outro ;;
 esac
 
+nome_app() {
+  case $1 in
+    photocraft) echo PhotoCraft ;; vectorcraft) echo VectorCraft ;; filmcraft) echo FilmCraft ;;
+    lightcraft) echo LightCraft ;; pdfcraft) echo PdfCraft ;; figcraft) echo FigCraft ;;
+    effectcraft) echo EffectCraft ;; soundcraft) echo SoundCraft ;; designcraft) echo DesignCraft ;;
+  esac
+}
 desc() {
   case $1 in
     photocraft) echo "Photoshop      — imagens raster" ;;
@@ -57,6 +64,8 @@ Sem opções, abre um menu para escolher os apps.
   --sem-build        Só clona; não compila
   --so-mcp           Só regenera o .mcp.json com os apps já compilados
   --migrar           Só converte projetos da estrutura antiga de pastas (ver ESTRUTURA.md)
+  --desktop          Instala também os apps com janela (instalador oficial + atalho na área de trabalho)
+  --sem-desktop      Não pergunta sobre os apps com janela
   -h, --ajuda        Esta ajuda
 
 Apps: ${APPS[*]}
@@ -183,7 +192,7 @@ listar() {
 }
 
 # ---------- argumentos ----------
-SELECAO=() ATUALIZAR=0 MANTER=0 BUILD=1 SO_MCP=0 CHECAR=0 ASSUME_YES=0 MIGRAR=0
+SELECAO=() ATUALIZAR=0 MANTER=0 BUILD=1 SO_MCP=0 CHECAR=0 ASSUME_YES=0 MIGRAR=0 DESKTOP=-1
 while (($#)); do
   case $1 in
     --apps) [[ $# -ge 2 ]] || die "--apps exige uma lista"; IFS=, read -ra SELECAO <<<"$2"; shift ;;
@@ -197,6 +206,8 @@ while (($#)); do
     --sem-build) BUILD=0 ;;
     --so-mcp) SO_MCP=1 ;;
     --migrar) MIGRAR=1 ;;
+    --desktop) DESKTOP=1 ;;
+    --sem-desktop) DESKTOP=0 ;;
     -h|--ajuda|--help) uso; exit 0 ;;
     *) die "opção desconhecida: $1 (veja --ajuda)" ;;
   esac
@@ -259,6 +270,11 @@ avaliar_prereqs() {
   FALTA=() RUST_ACAO=""
   if ((BUILD)) && ! rust_ok; then
     if command -v rustup >/dev/null; then RUST_ACAO=atualizar; else RUST_ACAO=instalar; precisa+=(curl); fi
+  fi
+  # Apps com janela: curl baixa o instalador e perl lê o SHA-256 publicado na release.
+  if ((DESKTOP == 1)); then
+    if [[ " ${precisa[*]} " != *" curl "* ]]; then precisa+=(curl); fi
+    precisa+=(perl)
   fi
   log "Pré-requisitos"
   for t in "${precisa[@]}"; do
@@ -376,6 +392,16 @@ if ((!SO_MCP && !MIGRAR)) && ((${#SELECAO[@]} == 0)); then
 fi
 for a in "${SELECAO[@]}"; do is_app "$a" || die "app desconhecido: $a"; done
 
+# Apps com janela: pergunta só em terminal interativo; sem resposta, fica só o MCP.
+if ((DESKTOP == -1)); then
+  DESKTOP=0
+  if ((!SO_MCP && !MIGRAR && !ASSUME_YES)) && [[ -t 0 ]]; then
+    if confirmar "Instalar também os apps com janela (instalador oficial + atalho na área de trabalho)?" \
+      "Sim, com atalho" "Não, só o MCP"; then DESKTOP=1; fi
+    echo
+  fi
+fi
+
 # ---------- baixar / compilar ----------
 instalar() {
   local a=$1 dir="$ROOT/$1" bin tmp
@@ -404,6 +430,166 @@ instalar() {
     mv "$tmp/$a-cli" "$bin"; rmdir "$tmp"
   fi
   ok "$a: pronto ($(du -sh "$bin" | cut -f1))"
+}
+
+# ---------- apps com janela (instaladores oficiais das releases) ----------
+# Opcional (--desktop): o MCP continua usando o <app>-cli compilado; isto instala o app com interface para abrir os
+# brutos à mão. Baixa o instalador da release mais recente, confere o SHA-256 que o GitHub publica e instala do jeito
+# nativo do sistema, com atalho na área de trabalho. Falha de um app só gera aviso; o setup segue.
+arch_release() {
+  case $(uname -m) in
+    x86_64|amd64) echo x86_64 ;; aarch64|arm64) echo aarch64 ;; riscv64) echo riscv64 ;;
+  esac
+}
+
+# deb|rpm|pacman|appimage|dmg
+formato_desktop() {
+  if [[ $SO == mac ]]; then echo dmg; return; fi
+  case $(gerenciador) in
+    apt-get) echo deb ;; dnf|zypper) echo rpm ;; pacman) echo pacman ;; *) echo appimage ;;
+  esac
+}
+
+# Tag (vX.Y.Z) da release mais recente, pelo redirecionamento de /releases/latest (sem API).
+tag_release() {
+  local u
+  u=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$REPO_BASE/$1/releases/latest") || return 1
+  [[ $u == */tag/* ]] || return 1
+  echo "${u##*/}"
+}
+
+# SHA-256 que o GitHub publica para o asset (vazio se não houver).
+digest_release() {
+  curl -fsSL "https://api.github.com/repos/${REPO_BASE#https://github.com/}/$1/releases/tags/$2" 2>/dev/null |
+    ASSET="$3" perl -0777 -ne \
+      'print $1 if /"name":\s*"\Q$ENV{ASSET}\E"(?:(?!"name":).)*?"digest":\s*"sha256:([0-9a-f]{64})"/s' || true
+}
+
+sha256_de() {
+  if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+
+pasta_desktop() {
+  local d
+  d=$(xdg-user-dir DESKTOP 2>/dev/null) || d=""
+  [[ -n $d && $d != "$HOME" ]] || d="$HOME/Desktop"
+  echo "$d"
+}
+
+# Copia um lançador .desktop para a área de trabalho e o marca como confiável (GNOME pede isso para abrir).
+atalho_linux() {
+  local origem=$1 dir dest
+  dir=$(pasta_desktop)
+  if [[ ! -d $dir ]]; then warn "pasta da área de trabalho não encontrada; o atalho ficou só no menu"; return 0; fi
+  dest="$dir/$(basename "$origem")"
+  cp "$origem" "$dest" && chmod +x "$dest"
+  gio set "$dest" metadata::trusted true 2>/dev/null || true
+  ok "atalho criado em $dest"
+}
+
+# Lançador que o pacote instalou: os pacotes oficiais usam /usr/share/applications/ai.storyteller.<app>.desktop.
+lancador_instalado() {
+  local d f
+  for d in /usr/share/applications /usr/local/share/applications "$HOME/.local/share/applications"; do
+    if [[ -f $d/ai.storyteller.$1.desktop ]]; then echo "$d/ai.storyteller.$1.desktop"; return 0; fi
+  done
+  for d in /usr/share/applications /usr/local/share/applications "$HOME/.local/share/applications"; do
+    for f in "$d"/*.desktop; do
+      [[ -f $f ]] || continue
+      case $(basename "$f" | tr '[:upper:]' '[:lower:]') in *"$1"*) echo "$f"; return 0 ;; esac
+    done
+  done
+  return 1
+}
+
+# Mesmas categorias dos lançadores dos pacotes oficiais.
+categoria_app() {
+  case $1 in
+    soundcraft) echo "AudioVideo;Audio;" ;; filmcraft|effectcraft) echo "AudioVideo;Video;" ;;
+    pdfcraft|designcraft) echo "Office;" ;; *) echo "Graphics;" ;;
+  esac
+}
+
+instalar_appimage() {
+  local a=$1 arq=$2 dest lanc
+  mkdir -p "$HOME/Applications" "$HOME/.local/share/applications"
+  dest="$HOME/Applications/$(nome_app "$a").AppImage"
+  mv "$arq" "$dest" && chmod +x "$dest"
+  lanc="$HOME/.local/share/applications/ai.storyteller.$a.desktop"
+  cat >"$lanc" <<EOD
+[Desktop Entry]
+Type=Application
+Name=$(nome_app "$a")
+Comment=$(desc "$a" | sed 's/.*— //')
+Exec="$dest" %F
+Icon=ai.storyteller.$a
+Terminal=false
+Categories=$(categoria_app "$a")
+EOD
+  ok "$(nome_app "$a") em $dest"
+  atalho_linux "$lanc"
+}
+
+instalar_dmg() {
+  local a=$1 arq=$2 mnt app destdir
+  mnt=$(mktemp -d)
+  if ! hdiutil attach -nobrowse -readonly -quiet -mountpoint "$mnt" "$arq"; then warn "$a: não consegui abrir o .dmg"; return 1; fi
+  app=$(find "$mnt" -maxdepth 1 -name '*.app' | head -1)
+  if [[ -z $app ]]; then hdiutil detach -quiet "$mnt"; warn "$a: o .dmg não tem um .app"; return 1; fi
+  destdir=/Applications
+  if [[ ! -w $destdir ]]; then destdir="$HOME/Applications"; mkdir -p "$destdir"; fi
+  rm -rf "${destdir:?}/$(basename "$app")"
+  ditto "$app" "$destdir/$(basename "$app")"
+  hdiutil detach -quiet "$mnt" || true
+  rmdir "$mnt" 2>/dev/null || true
+  ok "$(basename "$app") em $destdir"
+  ln -sfn "$destdir/$(basename "$app")" "$HOME/Desktop/$(nome_app "$a")" && ok "atalho criado na Mesa"
+}
+
+instalar_desktop() {
+  local a=$1 arch fmt tag v asset tmp arq dig sudo="" lanc
+  arch=$(arch_release); fmt=$(formato_desktop)
+  if [[ $SO != mac && -z $arch ]]; then warn "$a (janela): sem instalador para $(uname -m)"; return 0; fi
+  if [[ $arch == riscv64 && ($fmt == appimage || $fmt == pacman) ]]; then
+    warn "$a (janela): em riscv64 só há .deb e .rpm"; return 0
+  fi
+  if ! tag=$(tag_release "$a"); then warn "$a (janela): não consegui consultar a release mais recente"; return 0; fi
+  v=${tag#v}
+  case $fmt in
+    dmg) asset="$a-$v-macos-universal.dmg" ;;
+    deb) asset="$a-$v-linux-$arch.deb" ;;
+    rpm) asset="$a-$v-linux-$arch.rpm" ;;
+    pacman) asset="$a-$v-linux-$arch.pkg.tar.zst" ;;
+    appimage) asset="$a-$v-linux-$arch.AppImage" ;;
+  esac
+  log "$(nome_app "$a") (janela): baixando $asset"
+  tmp=$(mktemp -d); arq="$tmp/$asset"
+  if ! curl -fSL --progress-bar -o "$arq" "$REPO_BASE/$a/releases/download/$tag/$asset"; then
+    warn "$a (janela): download falhou"; rm -rf "$tmp"; return 0
+  fi
+  dig=$(digest_release "$a" "$tag" "$asset")
+  if [[ -z $dig ]]; then warn "$a (janela): a release não publica o SHA-256 de $asset; não instalado"; rm -rf "$tmp"; return 0; fi
+  if [[ $(sha256_de "$arq") != "$dig" ]]; then warn "$a (janela): SHA-256 não confere; download descartado"; rm -rf "$tmp"; return 0; fi
+  ok "SHA-256 conferido"
+  if [[ $fmt == deb || $fmt == rpm || $fmt == pacman ]] && ((EUID != 0)); then sudo=sudo; fi
+  case $fmt in
+    deb)
+      # Caminho absoluto: o apt instala o arquivo local e resolve as dependências.
+      if ! $sudo apt-get install -y "$arq"; then warn "$a (janela): apt falhou"; rm -rf "$tmp"; return 0; fi ;;
+    rpm)
+      if [[ $(gerenciador) == zypper ]]; then
+        if ! $sudo zypper --non-interactive install --allow-unsigned-rpm "$arq"; then warn "$a (janela): zypper falhou"; rm -rf "$tmp"; return 0; fi
+      elif ! $sudo dnf install -y "$arq"; then warn "$a (janela): dnf falhou"; rm -rf "$tmp"; return 0; fi ;;
+    pacman)
+      if ! $sudo pacman -U --noconfirm "$arq"; then warn "$a (janela): pacman falhou"; rm -rf "$tmp"; return 0; fi ;;
+    appimage) instalar_appimage "$a" "$arq" ;;
+    dmg) instalar_dmg "$a" "$arq" || true ;;
+  esac
+  if [[ $fmt == deb || $fmt == rpm || $fmt == pacman ]]; then
+    ok "$(nome_app "$a") instalado (menu de aplicativos)"
+    if lanc=$(lancador_instalado "$a"); then atalho_linux "$lanc"; else warn "$a: lançador do menu não encontrado; sem atalho"; fi
+  fi
+  rm -rf "$tmp"
 }
 
 # ---------- .mcp.json ----------
@@ -555,6 +741,10 @@ if ((!SO_MCP)); then
   instalar_prereqs
   log "Apps escolhidos: ${SELECAO[*]}"
   for a in "${SELECAO[@]}"; do instalar "$a"; done
+  if ((DESKTOP == 1)); then
+    log "Apps com janela"
+    for a in "${SELECAO[@]}"; do instalar_desktop "$a"; done
+  fi
 fi
 preparar_pastas
 gerar_mcp

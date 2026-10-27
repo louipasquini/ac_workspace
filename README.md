@@ -83,15 +83,18 @@ Sem argumentos, o script:
    No Windows o menu é o mesmo, com `[x]` e `>` no lugar dos símbolos (a fonte padrão do console não tem ◉/❯).
    Sem terminal interativo (saída redirecionada, CI), o script volta à lista numerada em que se digitam os
    números; para automatizar, use `--apps`;
-2. **confere os pré-requisitos** e mostra o que está ok e o que falta;
-3. se faltar algo, **mostra o que vai instalar e pergunta** com um menu *Sim, instalar / Não, sair*
+2. pergunta se você quer **também os apps com janela** (*Sim, com atalho / Não, só o MCP*; ver
+   [Apps com janela](#apps-com-janela-opcional));
+3. **confere os pré-requisitos** e mostra o que está ok e o que falta;
+4. se faltar algo, **mostra o que vai instalar e pergunta** com um menu *Sim, instalar / Não, sair*
    (setas + enter, ou `s`/`n`);
-4. para cada app: clona `github.com/storytold/<app>` em `<app>/` (clone raso, só o último commit), compila só o
+5. para cada app: clona `github.com/storytold/<app>` em `<app>/` (clone raso, só o último commit), compila só o
    servidor MCP (`cargo build --release -p <app>-cli`), apaga o cache de compilação (`target/`) e mantém só o
    binário em `<app>/target/release/<app>-cli` (`.exe` no Windows);
-5. cria `projetos/` e a biblioteca do LightCraft; se encontrar a estrutura antiga de pastas, oferece a
+6. se você pediu, instala o **app com janela** de cada um, com atalho na área de trabalho;
+7. cria `projetos/` e a biblioteca do LightCraft; se encontrar a estrutura antiga de pastas, oferece a
    [migração](ESTRUTURA.md#migrando-da-estrutura-antiga);
-6. gera o `.mcp.json` com os caminhos absolutos desta pasta, **só com os apps que estão compilados**.
+8. gera o `.mcp.json` com os caminhos absolutos desta pasta, **só com os apps que estão compilados**.
 
 Depois, abra o Claude Code na pasta e aprove os servidores MCP do projeto.
 
@@ -143,6 +146,30 @@ Os apps são compilados um de cada vez, então você precisa de espaço livre pa
 Os 9 juntos com `--manter-build` passam de 50 GB; sem ele, ficam em torno de 1,2 GB. A compilação também leva
 tempo: de alguns minutos a mais de meia hora por app, dependendo da máquina.
 
+### Apps com janela (opcional)
+
+O Claude não precisa deles: ele usa os servidores MCP (`<app>-cli`), que rodam sem janela. Os apps com janela servem
+para **você** abrir os brutos (`.pcraft`, `.ecproj`, `.designcraft`…) e ajustar à mão. O setup instala o app pelo
+**instalador oficial** da release mais recente de cada um no GitHub, confere o SHA-256 que o GitHub publica para o
+arquivo (se não bater, descarta) e cria o atalho:
+
+| Sistema | Instalador | Onde fica | Atalho |
+|---|---|---|---|
+| Debian/Ubuntu | `.deb` via `apt-get` (pede a senha do sudo) | menu de aplicativos | área de trabalho (marcado como confiável no GNOME) |
+| Fedora / openSUSE | `.rpm` via `dnf` / `zypper` | menu de aplicativos | área de trabalho |
+| Arch | `.pkg.tar.zst` via `pacman` | menu de aplicativos | área de trabalho |
+| Outras distros | AppImage em `~/Applications/` + lançador em `~/.local/share/applications/` | menu de aplicativos | área de trabalho |
+| macOS | `.dmg` (universal) copiado para `/Applications` (ou `~/Applications` sem permissão) | Launchpad | atalho na Mesa |
+| Windows | `.msi` via `msiexec` (o Windows pede permissão de administrador) | Menu Iniciar | área de trabalho |
+
+Para instalar ou atualizar só os apps com janela depois, sem recompilar o MCP:
+`./setup.sh --apps <app> --desktop --sem-build` (Windows: `.\setup.ps1 -Apps <app> -Desktop -SemBuild`).
+Para desinstalar, use o caminho normal do sistema (gerenciador de pacotes, Lixo no macOS, "Aplicativos instalados"
+no Windows).
+
+> **LightCraft:** o app com janela e o servidor MCP não podem abrir a biblioteca `projetos/_bibliotecas/lightcraft`
+> ao mesmo tempo. Para usá-la no app, feche antes o Claude Code (ou abra outra biblioteca no app).
+
 ### Opções
 
 | Linux/macOS | Windows | Faz |
@@ -158,6 +185,8 @@ tempo: de alguns minutos a mais de meia hora por app, dependendo da máquina.
 | `./setup.sh --sem-build` | `.\setup.ps1 -SemBuild` | Só clona |
 | `./setup.sh --so-mcp` | `.\setup.ps1 -SoMcp` | Só regenera o `.mcp.json` (ex.: depois de mover a pasta de lugar) |
 | `./setup.sh --migrar` | `.\setup.ps1 -Migrar` | Só converte projetos da [estrutura antiga](ESTRUTURA.md#migrando-da-estrutura-antiga) de pastas |
+| `./setup.sh --desktop` | `.\setup.ps1 -Desktop` | Instala também os [apps com janela](#apps-com-janela-opcional), sem perguntar |
+| `./setup.sh --sem-desktop` | `.\setup.ps1 -SemDesktop` | Não pergunta sobre os apps com janela |
 
 No Windows, o PowerShell precisa do prefixo `powershell -ExecutionPolicy Bypass -File` quando a política de
 execução bloqueia scripts (o padrão).
@@ -229,7 +258,8 @@ A estrutura completa está em [`ESTRUTURA.md`](ESTRUTURA.md) e o fluxo detalhado
 | Setup: "No space left on device" | Disco cheio durante a compilação | Libere espaço para o maior app da seleção (tabela acima) e rode de novo |
 | "outside the automation roots" | Caminho fora de `projetos/` ou relativo | Use caminho absoluto dentro de `projetos/` |
 | Pastas `referencias/`, `materiais/` ou `finalizados/` na raiz | Estrutura antiga de pastas | Feche as sessões do Claude Code e rode `./setup.sh --migrar` (Windows: `.\setup.ps1 -Migrar`) |
-| LightCraft: "library already open" | Biblioteca em uso por outro processo (ex.: outra sessão do Claude Code aberta) | Feche a outra sessão; use só um processo por biblioteca |
+| LightCraft: "library already open" | Biblioteca em uso por outro processo (outra sessão do Claude Code, ou o LightCraft com janela aberto nela) | Feche o outro processo; use só um por biblioteca |
+| Setup: "SHA-256 não confere" (app com janela) | Download corrompido ou interceptado | Rode de novo; se repetir, baixe pela página de releases do app e confira |
 | Muitas ferramentas (PdfCraft tem 179) | — | Já usamos `--compact`; o resto via `tool_search`/`tool_call` |
 
 ## Controle de versão
